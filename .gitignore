@@ -1,0 +1,28 @@
+﻿# R files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Data files (don't commit raw data)
+data/raw/
+data/processed/
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Results
+results/
+!results/.gitkeep
+
+# Models
+models/fitted/
+!models/fitted/.gitkeep
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
