@@ -66,11 +66,13 @@ The analysis follows a four-stage pipeline:
 ## Data Sources
 
 ### Primary Analysis Data
-- **AVENIR** (Niger): 2,375 communities, 382,586 children
-- **CHAT** (Burkina Faso): 341 communities, 68,246 children  
-- **MORDOR I/II** (Niger): 1,533 communities, 190,238 children
-- **MORDOR I** (Tanzania): 613 communities, 79,550 children
-- **MORDOR I** (Malawi): 551 communities, 118,591 children
+* **AVENIR** (Niger): **2,158** communities, **619,228** children
+* **CHAT** (Burkina Faso): **285** communities, **237,434** children
+* **MORDOR I/II** (Niger): **594** communities, **400,111** children
+* **MORDOR I** (Tanzania): **613** communities, **131,095** children
+* **MORDOR I** (Malawi): **304** communities, **240,384** children
+
+*(Total across settings: 3,954 communities, 1,628,252 children.)*
 
 ### Auxiliary Data
 - **DHS birth histories**: 17 surveys across 5 countries for neonatal-postneonatal hazard relationships
