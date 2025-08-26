@@ -1,0 +1,60 @@
+\ProvidesPackage{gates_theme}
+\mode<presentation>
+
+% Base theme
+\useinnertheme{default}
+\useoutertheme{miniframes}
+\usecolortheme{default}
+\usefonttheme{professionalfonts}
+\setbeamercovered{transparent}
+\setbeamertemplate{navigation symbols}{}
+
+% Font
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+% Gates Foundation Colors
+\definecolor{GatesBlue}{RGB}{0,113,188}
+\definecolor{AccentGrey}{RGB}{85,85,85}
+\definecolor{LightGrey}{RGB}{240,240,240}
+
+% Slide title
+\setbeamercolor{frametitle}{fg=white,bg=GatesBlue}
+\setbeamerfont{frametitle}{series=\bfseries,size=\Large}
+
+% Body text
+\setbeamercolor{normal text}{fg=black,bg=white}
+\setbeamerfont{title}{series=\bfseries,size=\Huge}
+\setbeamercolor{title}{fg=GatesBlue}
+\setbeamerfont{subtitle}{series=\bfseries,size=\large}
+\setbeamerfont{item}{size=\normalsize}
+\setbeamercolor{item}{fg=GatesBlue}
+\setbeamercolor{structure}{fg=GatesBlue}
+
+% Footer with frame number
+\setbeamertemplate{footline}{
+	\hfill
+	\usebeamercolor[fg]{date in head/foot}
+	\scriptsize \insertframenumber{} / \inserttotalframenumber \hspace{1em}
+	\vspace{0.3em}
+}
+
+\setbeamertemplate{frametitle}{
+	\begin{beamercolorbox}[wd=\paperwidth,ht=2.5ex,dp=1.2ex,leftskip=1em]{frametitle}
+		\usebeamerfont{frametitle} \insertframetitle
+	\end{beamercolorbox}
+}
+
+% Title page layout (optional logo top-right)
+\setbeamertemplate{title page}{
+	\begin{center}
+		\vspace*{1.5cm}
+		{\usebeamerfont{title}\usebeamercolor[fg]{title}\inserttitle\par}
+		\vskip1em
+		{\usebeamerfont{subtitle}\insertsubtitle\par}
+		\vskip2em
+		{\usebeamerfont{author}\insertauthor\par}
+		\vskip1em
+		{\usebeamerfont{date}\insertdate\par}
+	\end{center}
+}

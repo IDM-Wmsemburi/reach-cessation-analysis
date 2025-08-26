@@ -1,28 +1,305 @@
-﻿# R files
-.Rproj.user
+﻿# ===============================================================================
+# REACH Secondary Analysis - Git Ignore File
+# ===============================================================================
+
+# ===============================================================================
+# R AND RSTUDIO FILES
+# ===============================================================================
+
+# History files
 .Rhistory
+.Rapp.history
+
+# Session Data files
 .RData
+.RDataTmp
+
+# User-specific files
 .Ruserdata
+
+# R Studio files
+.Rproj.user/
 *.Rproj
 
-# Data files (don't commit raw data)
-data/raw/
-data/processed/
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+# R Environment Variables
+.Renviron
 
-# Results
-results/
-!results/.gitkeep
+# R package development
+*.Rcheck/
+*.Rbuild/
+.Rproj.user*
 
-# Models
-models/fitted/
-!models/fitted/.gitkeep
+# pkgdown site
+docs/
 
-# System files
-.DS_Store
-Thumbs.db
+# translation temp files
+po/*~
 
-# Temporary files
+# RStudio Connect folder
+rsconnect/
+
+# ===============================================================================
+# DATA FILES (SENSITIVE/LARGE)
+# ===============================================================================
+
+# Raw DHS data files (contain sensitive microdata)
+data/DHS/*.dta
+data/DHS/*.sav
+data/DHS/*.csv
+data/DHS/raw/
+
+# IHME raster files (large geospatial data)
+data/IHME/*.tif
+data/IHME/*.TIF
+data/IHME/*.tiff
+data/IHME/*.TIFF
+
+# Malaria data files (large rasters)
+data/Malaria/*.tif
+data/Malaria/*.TIF
+data/Malaria/*.tiff
+data/Malaria/*.TIFF
+
+# Any large data files
+*.rda
+*.RData
+!data/Clean/data_crt_geospatial.rda  # Exception for processed trial data if small enough
+
+# Compressed data archives
+data/**/*.zip
+data/**/*.gz
+data/**/*.tar
+data/**/*.7z
+
+# ===============================================================================
+# ANALYSIS OUTPUTS
+# ===============================================================================
+
+# Large result files (keep structure, ignore content)
+results/*.rda
+results/*.RData
+results/posterior*.rda
+results/mixed_effects*.rda
+
+# Stan model compilation outputs
+models/stan/*.hpp
+models/stan/*.so
+models/stan/*.exe
+models/stan/tmp*
+
+# Large figure outputs
+results/figs/*.png
+results/figs/*.pdf
+results/figs/*.jpg
+results/figs/*.jpeg
+results/figs/*.svg
+
+# Keep small CSV summaries but not large ones
+results/*large*.csv
+results/*raw*.csv
+
+# Temporary analysis files
+tmp/
+temp/
 *.tmp
+*.temp
+
+# ===============================================================================
+# SYSTEM AND EDITOR FILES
+# ===============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===============================================================================
+# EDITOR AND IDE FILES
+# ===============================================================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ===============================================================================
+# COMPILATION AND BUILD FILES
+# ===============================================================================
+
+# C/C++ compilation (for Stan models)
+*.o
+*.so
+*.dll
+*.dylib
+
+# Fortran module files
+*.mod
+
+# Compiled Stan models
+models/**/*.hpp
+models/**/*.so
+models/**/*.exe
+
+# ===============================================================================
+# LOG AND CACHE FILES
+# ===============================================================================
+
+# Log files
 *.log
+logs/
+log/
+
+# Cache directories
+cache/
+.cache/
+__pycache__/
+
+# Package manager files
+packrat/lib*/
+packrat/src/
+renv/library/
+renv/local/
+renv/staging/
+
+# ===============================================================================
+# DOCUMENTATION BUILD FILES
+# ===============================================================================
+
+# LaTeX compilation files
+manuscript/*.aux
+manuscript/*.bbl
+manuscript/*.blg
+manuscript/*.fdb_latexmk
+manuscript/*.fls
+manuscript/*.log
+manuscript/*.out
+manuscript/*.synctex.gz
+manuscript/*.toc
+manuscript/*.pdf  # Comment this out if you want to track PDFs
+
+# Knitr cache
+*_cache/
+*_files/
+
+# ===============================================================================
+# CONFIGURATION AND SECRETS
+# ===============================================================================
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# API keys and credentials
+credentials/
+secrets/
+config/secrets.R
+config/keys.R
+
+# ===============================================================================
+# TESTING AND COVERAGE
+# ===============================================================================
+
+# Test outputs
+tests/testthat/*.xml
+tests/testthat/*.log
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# ===============================================================================
+# CUSTOM EXCLUSIONS
+# ===============================================================================
+
+# Personal notes and drafts
+notes/
+drafts/
+personal/
+TODO.md
+NOTES.md
+
+# Backup files
+*.bak
+*.backup
+backup/
+
+# Archive directories
+archive/
+old/
+deprecated/
+
+# Large temporary datasets
+scratch/
+working/
+
+# Model outputs that are too large
+results/posterior_samples/
+results/mcmc_diagnostics/
+
+# ===============================================================================
+# EXCEPTIONS (ALWAYS INCLUDE THESE)
+# ===============================================================================
+
+# Always include these important files
+!README.md
+!LICENSE
+!run_analysis.R
+!config/
+!src/
+!models/stan/*.stan  # Include Stan model source files
+!data/README.md      # Documentation about data structure
+!results/README.md   # Documentation about results structure
+
+# Include example data files (if small)
+!data/examples/
+!data/test/
+
+# Include key configuration files
+!config/analysis_config.R
+!config/install_packages.R
+
+# Include documentation
+!docs/README.md
+!manuscript/*.tex
+!manuscript/*.bib
+!manuscript/*.Rnw
