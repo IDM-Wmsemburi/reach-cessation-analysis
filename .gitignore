@@ -209,7 +209,6 @@ manuscript/*.log
 manuscript/*.out
 manuscript/*.synctex.gz
 manuscript/*.toc
-manuscript/*.pdf  # Comment this out if you want to track PDFs
 
 # Knitr cache
 *_cache/
@@ -283,7 +282,6 @@ results/mcmc_diagnostics/
 # Always include these important files
 !README.md
 !LICENSE
-!run_analysis.R
 !config/
 !src/
 !models/stan/*.stan  # Include Stan model source files
@@ -303,3 +301,5 @@ results/mcmc_diagnostics/
 !manuscript/*.tex
 !manuscript/*.bib
 !manuscript/*.Rnw
+
+shps/

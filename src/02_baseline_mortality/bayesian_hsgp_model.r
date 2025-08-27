@@ -771,3 +771,115 @@ pdf(file.path(figs_dir, "prior_post_u5m.pdf"), width = 7, height = 5)
 if (!is.null(final_plot)) print(final_plot)
 dev.off()
 
+#########################################################################################
+### Some maps of observed hazards, predicte hazard, predicted imr and predicted u5mr
+
+map.df <- df.mod %>%
+  mutate(y_tilde = ifelse(trt == 0, y_159 + 0.5, NA),
+         log_h1_obs = ifelse(trt == 0 & y_tilde > 0 & E_yrs > 0,
+                             log((59/12) * (y_tilde / E_yrs)), NA),
+         log_h1_post = log(H1_total_pred_mean),
+         post_imr = 1e3*post_imr, post_u5mr = 1e3*post_u5mr,
+         latitude = latitude.x, longitude = longitude.x) %>%
+  select(trial_phase, country, community_id, latitude, longitude, 
+         log_h1_obs, log_h1_post, post_imr, post_u5mr) |>
+  left_join(data_crt_geospatial |> 
+              select(longitude, latitude, ihme_u5m_2015) |>
+              mutate(`IHME 2015` = 1e3*ihme_u5m_2015))
+
+get.surfaces.plot <- function(trial, cnt){
+  
+  require(sp)         # Always first: S4 classes used by most spatial packages
+  require(raster)     # Next: depends on sp
+  require(sf)         # Simple features (can go after raster/sp)
+  require(gstat)      # If you use it, after sp/raster
+  
+  select <- dplyr::select
+  
+  iso = countrycode::countrycode(cnt, "country.name", "iso3c")
+  
+  # Load administrative shapefile
+  admin <- sf::st_read(paste0("../../data/shps/gadm41_", iso, "_shp/gadm41_", iso, "_2.shp"), quiet = TRUE) |> 
+    st_transform(4326)
+  
+  data_all <- map.df |> filter(trial_phase == trial, country == cnt) 
+  
+  data_hazard_plot <- data_all |>
+    rename("Observed logH1" = log_h1_obs, 
+           "Smoothed logH1" = log_h1_post, 
+           "Post IMR" = post_imr, 
+           "Post U5MR" = post_u5mr) |>
+    gather(method, est, -c(trial_phase, country, community_id, latitude, longitude))
+  
+  data_hazard_sf <- st_as_sf(data_hazard_plot, coords = c("longitude", "latitude"), crs = 4326) |>
+    left_join(data_hazard_plot |> select(trial_phase, country, community_id, longitude, latitude) |> distinct())
+  
+  palette <- c("#0571b0", "#92c5de", "#ffffbf", "#f4a582", "#ca0020")
+  
+  plot_df <- data_hazard_sf %>% filter(method == "Post U5MR")
+  coords <- st_coordinates(plot_df)
+  
+  # Build spatial points object
+  spdf <- SpatialPointsDataFrame(coords = coords,
+                                 data = plot_df %>% st_drop_geometry(),
+                                 proj4string = CRS("+proj=utm +zone=30 +datum=WGS84 +units=m +no_defs"))
+  
+  # Define padded bounding box for interpolation
+  bbox <- st_bbox(plot_df)
+  xpad <- diff(c(bbox["xmin"], bbox["xmax"])) * 0.05
+  ypad <- diff(c(bbox["ymin"], bbox["ymax"])) * 0.05
+  xlim <- c(bbox["xmin"] - xpad, bbox["xmax"] + xpad)
+  ylim <- c(bbox["ymin"] - ypad, bbox["ymax"] + ypad)
+  
+  plot.map <- function(meth){
+    df <- data_hazard_sf |> filter(method == meth, !is.na(est))
+    
+    ggplot() +
+      geom_sf(data = admin, fill = NA, color = "gray30", size = 0.15) +
+      geom_point(data = df, aes(x = longitude, y = latitude, fill = est),
+                 size = 2.2, shape = 21, color = "black", stroke = 0.2) +
+      scale_fill_gradientn(colors = palette, #limits = limits_shared, 
+                           name = meth) +
+      coord_sf(xlim = xlim, ylim = ylim, expand = FALSE) +
+      theme_void() + 
+      theme(
+        legend.position = "right",
+        legend.title = element_text(size = 9, face = "bold"),
+        legend.text = element_text(size = 9),
+        plot.title = element_text(hjust = 0.5, size = 12, face = "bold")
+      ) 
+  }
+  
+  gg.obs <- plot.map("Observed logH1")
+  gg.smooth <- plot.map("Smoothed logH1")
+  gg.ihme <- plot.map("IHME 2015")
+  gg.imr <- plot.map("Post IMR")
+  gg.u5mr <- plot.map("Post U5MR") 
+  
+  thetrial = ifelse(trial %in% c("MORDOR I/II", "MORDOR I"), "MORDOR", trial)
+  titl <- paste(thetrial, cnt)
+  
+  require(patchwork)
+  all.gg <- patchwork::wrap_plots(gg.obs, gg.smooth, 
+                                  gg.ihme, gg.u5mr, ncol = 2) +
+    plot_annotation(
+      title = titl,
+      subtitle = "Observed & Smoothed log hazards, IHME & posterior U5MR per 1,000"
+    )
+  
+  message("5. Printing the combined figure")
+  
+  figs_dir <- "../../results/figs"
+  
+  pdf(file.path(figs_dir, paste0("Map ", titl, ".pdf")), 
+      width = 7, height = 5)
+  print(all.gg)
+  dev.off()
+}
+
+get.surfaces.plot("MORDOR I/II", "Niger")
+get.surfaces.plot("AVENIR", "Niger")
+get.surfaces.plot("MORDOR I", "Tanzania")
+get.surfaces.plot("MORDOR I", "Malawi")
+get.surfaces.plot("CHAT", "Burkina Faso")
+
