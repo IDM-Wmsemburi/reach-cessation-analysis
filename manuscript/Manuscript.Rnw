@@ -233,17 +233,81 @@ Likelihood ratio tests compare nested models to assess: (1) whether covariates e
 
 \subsection{Stage 5: Finding cessation thresholds}
 
-Our main goal was identifying the mortality level (first for U5MR and then for IMR, separately) where azithromycin's benefit disappears---where predicted treatment and placebo rates coincide. We modeled cluster deaths allowing the treatment effect to vary with baseline mortality:
+Our main goal was identifying the mortality level (first for U5MR and then for IMR, separately) where azithromycin's benefit disappears. We implemented two complementary approaches to ensure robust threshold estimation.
+
+\subsubsection{Interaction model specification}
+
+Both approaches used the same underlying model structure, allowing treatment effects to vary with baseline mortality:
 
 \[
 \log \mu_i = \alpha_{g[i]} + \beta_m \log M_i + T_i(\beta_t + \beta_{tm}\log M_i) + \log E_i,
 \]
 
-The crucial component is the interaction term $\beta_{tm}\log M_i$---this lets treatment effects change with baseline mortality $M_i$. We treated mortality estimates as uncertain rather than fixed values.
+The crucial component is the interaction term $\beta_{tm}\log M_i$---this lets treatment effects change with baseline mortality $M_i$. We treated mortality estimates as uncertain rather than fixed values, incorporating full posterior distributions from our spatial modeling.
 
-To find thresholds, we looked for "crossings"---mortality levels where predicted treatment and placebo curves intersect. For each set of model parameters, we calculated predicted rates across a range of baseline mortalities and located crossings where the difference changed sign. Linear interpolation gave us the exact crossing point.
+\subsubsection{Analytical approach}
 
-Full posterior distributions of thresholds were obtained by identifying all the MCMC draws that had such crossings.
+The analytical method exploits the mathematical structure of the interaction model. Treatment effects become zero when:
+
+\[
+\beta_t + \beta_{tm} \log M^* = 0,
+\]
+
+Solving for the threshold mortality level:
+
+\[
+M^* = \exp\left(-\frac{\beta_t}{\beta_{tm}}\right).
+\]
+
+This approach provides direct threshold estimates for each MCMC draw, yielding full posterior distributions with computational efficiency. However, it can be unstable as the $\beta_{tm}$ parameter approaches zero - which is particularly a challenge when baseline mortality is assumed to be a random variable.
+
+\subsubsection{Crossing-based approach}
+
+The crossing method generates predicted rates across a dense mortality grid. For each set of posterior draws, we calculated:
+
+\[
+\lambda_{\text{placebo}}(M) = \exp(\alpha + \beta_m \log M),
+\]
+\[
+\lambda_{\text{treatment}}(M) = \exp(\alpha + \beta_m \log M + \beta_t + \beta_{tm} \log M).
+\]
+
+We then identified mortality levels $M^*$ where $\lambda_{\text{treatment}}(M^*) = \lambda_{\text{placebo}}(M^*)$, using linear interpolation between grid points to locate exact crossings.
+
+The crossing-based approach provides a direct visualization of treatment benefit disappearing and serves as a validation for the analytical method.
+
+\subsection{Sensitivity analysis}
+
+To assess the robustness of our threshold estimates, we implemented a comprehensive sensitivity analysis across multiple modeling frameworks and data subsets.
+
+\subsubsection{Modeling approaches}
+
+We compared threshold estimates across three distinct modeling approaches:
+\begin{itemize}
+\item \textbf{Stan variable baseline:} Our primary approach using hierarchical trial-country random effects with mortality treated as uncertain (sampled from baseline posterior distributions).
+
+\item \textbf{Stan fixed baseline:} Alternative specification using point estimates of baseline mortality rather than full posterior distributions.
+
+\item \textbf{INLA implementation:} Independent implementation using integrated nested Laplace approximation for computational validation, with mortality treated as fixed covariates.
+\end{itemize}
+
+\subsubsection{Sequential exclusions}
+
+We systematically excluded each trial location to assess sensitivity to influential sites:
+
+\begin{itemize}
+\item INLA excluding Niger MORDOR I/II
+\item INLA excluding Niger AVENIR  
+\item INLA excluding Tanzania MORDOR I
+\item INLA excluding Malawi MORDOR I
+\item INLA excluding Burkina Faso CHAT
+\end{itemize}
+
+This sequential exclusion approach tests whether specific trial locations drive overall threshold estimates.
+
+\subsubsection{Threshold calculation methods}
+
+For each modeling scenario, we computed thresholds using both analytical and crossing-based methods, allowing assessment of method-specific sensitivity alongside model specification sensitivity.
 
 \section{Results}
 
@@ -274,16 +338,42 @@ MORDOR I/II & Niger        &   594 & 400,111 & 5,253 & 205,360 \\
 
 \subsection{Baseline mortality patterns}
 
-Our spatial modeling successfully estimated mortality for all clusters with appropriate uncertainty. Figure~\ref{fig:prior-post-u5m} shows how this worked: orange distributions are raw cluster estimates (quite variable), while blue distributions show our final estimates after spatial smoothing (more stable). 
+Our spatial modeling successfully estimated mortality for all clusters with appropriate uncertainty. Figure~\ref{fig:prior-post-u5m} shows how this worked: orange distributions are raw cluster estimates (quite variable), while blue distributions show our final estimates after spatial smoothing (more stable). We see how the posterior shrinks towards the prior (given by the dashed line and shaded area and also in the subtitle)---reducing extreme estimates while maintaining genuine variation between locations. This gives us reliable mortality estimates that reflect both local conditions and broader patterns. 
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=.9\textwidth]{../results/figs/prior_post_u5m.pdf}
+\includegraphics[width=\textwidth]{../results/figs/prior_post_u5m.pdf}
 \caption{\emph{Spatial modeling reduced wild variability while preserving real differences}}
 \label{fig:prior-post-u5m}
 \end{figure}
 
-We see how the posterior shrinks towards the prior (given by the dashed line and shaded area and also in the subtitle)---reducing extreme estimates while maintaining genuine variation between locations. This gives us reliable mortality estimates that reflect both local conditions and broader patterns.
+\emph{SPDE validation.} To validate our HSGP approach, we implemented an alternative specification using stochastic partial differential equations (SPDE) via INLA \citep{lindgren2011explicit, lindgren2015bayesian}. The SPDE approach represents the spatial field $u(\mathbf{s})$ as the solution to
+
+\[
+(\kappa^2 - \Delta)^{\alpha/2} u(\mathbf{s}) = \mathcal{W}(\mathbf{s}),
+\]
+
+where $\Delta$ is the Laplacian operator, $\mathcal{W}(\mathbf{s})$ is spatial white noise, and $\alpha = 2$ yields a Matérn covariance function with smoothness $\nu = 1$. We constructed triangulated meshes over cluster locations and fit negative binomial models to placebo-only observations:
+
+\[
+y_i \sim \mathrm{NegBin}(\mu_i, \phi), \qquad \log \mu_i = \log E_i + \beta_0 + u(\mathbf{s}_i),
+\]
+
+with penalized complexity priors on range and marginal variance parameters \citep{fuglstad2019pcgrf}.
+
+The SPDE implementation yielded cluster-level mortality estimates highly correlated with our HSGP + HS results across all trial-country combinations (Figure~\ref{fig:spde-post-u5m}). The SPDE approach provides a useful benchmark for validating our HSGP with horseshoe results. As shown in Figure~\ref{fig:spde-post-u5m}, posterior distributions from the SPDE (green) and HSGP (blue) align closely across trial–countries, both in central tendency and distributional shape. Because SPDE relies on a mesh-based approximation of Matérn fields, independent of the basis-function construction in HSGP, the agreement confirms that the HSGP estimates are not artefacts of model specification but instead capture the underlying mortality patterns robustly. 
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=\textwidth]{../results/figs/spde_post_u5m.pdf}
+\caption{\emph{HSGP + HS produces estimates comparable to SPDE}}
+\label{fig:spde-post-u5m}
+\end{figure}
+
+However, the SPDE approach requires multi-stage modeling to propagate uncertainty through age decomposition and neonatal bridging, whereas our HSGP formulation generates predictions directly in deaths space within a single Stan model. This unified approach preserves full posterior uncertainty through all transformations from cluster-specific hazards to demographic indicators, making it preferable for threshold estimation where uncertainty quantification is critical.
+
+
+\subsubsection{Mapping to demographic indicators}
 
 Translation to standard demographic indicators also worked well. Table~\ref{tab:agedem} shows mortality estimates by trial-country and treatment group. IMR:U5MR ratios stay within expected bounds (0.5--0.65), validating our approach. Treatment and placebo groups within each trial-country show similar estimates, supporting successful prediction out-of-sample (only placebo where used to estimate baseline).
 
@@ -309,14 +399,13 @@ if(file.exists(path_csv)) {
       Treatment = ifelse(trt == 1, "Azithromycin", "Placebo")
     ) %>%
     select(`Trial--Country`, Treatment, 
-           `IMR (mean $\\pm$ SD)` = IMR, 
-           `U5MR (mean $\\pm$ SD)` = U5MR,
+           `IMR (mean and SD)` = IMR, 
+           `U5MR (mean and SD)` = U5MR,
            Ratio = `IMR:U5MR`)
   
   kable(
     tab_age,
-    caption = "\\emph{Baseline mortality estimates by trial-country and treatment arm}",
-    label = "tab:agedem",
+ caption = "\\label{tab:agedem}\\emph{Baseline mortality estimates by trial-country and treatment arm}",
     booktabs = TRUE,
     align = c("l","l","r","r","r"),
     linesep = c("","\\midrule", "","\\midrule", "","\\midrule", "","\\midrule", "", "\\midrule", "","\\midrule", "","\\midrule", "","\\midrule", "","\\midrule")
@@ -351,6 +440,7 @@ Out of 45 treatment interaction tests, only 5 were statistically significant---a
 
 These findings support focusing on baseline mortality as the primary criterion for cessation decisions.
 
+\newpage
 \subsection{The cessation thresholds}
 
 Our treatment-mortality interaction models successfully converged for both IMR and U5MR, yielding the first empirically grounded cessation thresholds. Table~\ref{tab:thresholds} shows our main results.
@@ -376,8 +466,7 @@ thr_tab <- threshold_results %>%
 
 kable(
   thr_tab,
-  caption = "\\emph{Data-driven cessation thresholds for azithromycin MDA programs}",
-  label = "tab:thresholds",
+  caption = "\\label{tab:thresholds}\\emph{Data-driven cessation thresholds for azithromycin MDA programs}",
   booktabs = TRUE, 
   align = c("l","r"),
   linesep = ""
@@ -399,20 +488,91 @@ The prediction curves (Figures~\ref{fig:mortality-predictions1} and \ref{fig:mor
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=.9\textwidth]{../results/figs/threshold_u5mr.pdf}
+\includegraphics[width=\textwidth]{../results/figs/threshold_u5mr.pdf}
 \caption{\emph{Treatment benefits vanish as baseline under-five mortality increases}}
 \label{fig:mortality-predictions1}
 \end{figure}
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=.9\textwidth]{../results/figs/threshold_imr.pdf}
+\includegraphics[width=\textwidth]{../results/figs/threshold_imr.pdf}
 \caption{\emph{Treatment benefits vanish as baseline infant mortality increases}}
 \label{fig:mortality-predictions2}
 \end{figure}
 
 The uncertainty ranges around these thresholds acknowledge the limits of available data while providing actionable guidance for program managers.
 
+\subsection{Sensitivity analysis}
+
+To assess robustness, we tested our threshold estimates across multiple modeling approaches and data subsets. Figure~\ref{fig:crossing-sensitivity} shows threshold distributions using the crossing method across eight scenarios, while Figure~\ref{fig:analytical-sensitivity} shows results from the analytical approach.
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=\textwidth]{../results/figs/crossing_threshold_densities.pdf}
+\caption{\emph{Crossing-based threshold distributions across modeling scenarios}}
+\label{fig:crossing-sensitivity}
+\end{figure}
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=\textwidth]{../results/figs/analytical_threshold_densities.pdf}
+\caption{\emph{Analytical threshold distributions across modeling scenarios}}
+\label{fig:analytical-sensitivity}
+\end{figure}
+
+<<sensitivity-summary-table, echo=FALSE, results='asis', message=FALSE, warning=FALSE>>=
+# Load sensitivity results
+all_results_path <- "../results/all_threshold_results.csv"
+if(file.exists(all_results_path)) {
+  all_results <- read_csv(all_results_path, show_col_types = FALSE)
+  
+  # Create summary table like in presentation
+  summary_table <- all_results %>%
+    filter(!is.na(median)) %>%
+    mutate(
+      ci_display = sprintf("%.1f (%.1f-%.1f)", median, lower, upper)
+    ) %>%
+    select(scenario, model, type, ci_display) %>%
+    pivot_wider(
+      names_from = c(model, type), 
+      values_from = ci_display,
+      names_sep = "_"
+    ) %>%
+    arrange(scenario)
+  
+  if(nrow(summary_table) > 0 && ncol(summary_table) >= 3) {
+    # Clean up scenario names for display
+    summary_table <- summary_table %>%
+      mutate(
+        scenario = case_when(
+          str_detect(scenario, "STAN Random") ~ "STAN Random Baseline",
+          str_detect(scenario, "STAN Fixed") ~ "STAN Fixed Baseline", 
+          str_detect(scenario, "INLA All") ~ "INLA All",
+          str_detect(scenario, "Niger MORDOR") ~ "INLA -Niger MORDOR",
+          str_detect(scenario, "Niger AVENIR") ~ "INLA -Niger AVENIR",
+          str_detect(scenario, "Tanzania") ~ "INLA -Tanzania MORDOR",
+          str_detect(scenario, "Malawi") ~ "INLA -Malawi MORDOR",
+          str_detect(scenario, "Burkina") ~ "INLA -Burkina CHAT",
+          TRUE ~ scenario
+        )
+      )
+    
+    kable(
+      summary_table,
+      caption = "\\label{tab:sensitivity-summary}\\emph{Threshold estimates across modeling scenarios and calculation methods}",
+      booktabs = TRUE,
+      align = c("l", rep("c", ncol(summary_table)-1)),
+      linesep = c("", "", rep("", nrow(summary_table)-3))
+    )
+  }
+} else {
+  cat("\\textit{Sensitivity analysis results not available during compilation.}")
+}
+@
+
+Table~\ref{tab:sensitivity-summary} summarizes threshold estimates across all scenarios and methods. The crossing method shows consistent estimates across different modeling approaches, while the analytical method exhibits some variability in certain scenarios. Overall, estimates demonstrate reasonable consistency across alternative specifications and data subsets.
+
+\clearpage
 \section{Discussion}
 
 This study provides the first data-driven cessation thresholds for azithromycin MDA programs. We found that benefits disappear when U5MR falls below approximately \Sexpr{thr_tab$`Threshold (per 1,000)`[1]} per 1,000 or IMR falls below approximately \Sexpr{thr_tab$`Threshold (per 1,000)`[2]} per 1,000 live births.

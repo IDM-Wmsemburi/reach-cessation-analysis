@@ -10,6 +10,11 @@
 \usepackage{booktabs} 
 \usepackage[dvipsnames]{xcolor} 
 \definecolor{ForestGreen}{RGB}{34,139,34}
+\usepackage{xcolor}
+\definecolor{ObsOrange}{HTML}{E69F00}   % "Observed"
+\definecolor{PostBlue}{HTML}{0072B2}    % "Posterior"
+\definecolor{SpdeGreen}{HTML}{009E73}   % "SPDE"
+\definecolor{PriorGray}{gray}{0.70}     % prior band (≈ grey70)
 
 %\setbeameroption{show notes on second screen=right}
 \setbeamersize{text margin left=0.5cm,text margin right=0.5cm}
@@ -220,12 +225,12 @@ MORDOR I/II & Niger & 594 & 400,111 & 5,253 & 205,360 \\
 \begin{frame}{Baseline Mortality Patterns}
 \begin{columns}
 \begin{column}{0.4\textwidth}
-\textbf{Spatial Model $\mu_i = 1e3*(1 - exp(-H_{i,1}^{59}))$:}
+\textbf{Spatial Model $\mu_i = 1000 \times (1 - \exp(-H_{i,1}^{59}))$:}
 \begin{itemize}
-  \item Orange: Raw cluster estimates 
-  \item Blue: Posterior cluster means
-  \item Dashed (and grey): Trial-country priors
-  \item Text (median and CrI): Trial-country priors
+  \item \textcolor{ObsOrange}{Observed data}: raw cluster estimates (placebo)
+  \item \textcolor{PostBlue}{Posterior}: cluster posterior means
+  \item \textcolor{PriorGray}{Prior}: trial–country prior (shaded band) with
+        dashed prior mean (text labels also prior mean and 95\% CI)
 \end{itemize}
 \end{column}
 \begin{column}{0.6\textwidth}
@@ -236,11 +241,29 @@ MORDOR I/II & Niger & 594 & 400,111 & 5,253 & 205,360 \\
 \end{columns}
 \end{frame}
 
+\begin{frame}{Validating HSGP + HS using SPDE}
+\begin{columns}
+\begin{column}{0.4\textwidth}
+\begin{itemize}
+  \item \textcolor{SpdeGreen}{SPDE posteriors} closely overlap \textcolor{PostBlue}{HSGP + HS}
+  \item Both recover similar distributional shapes across clusters
+  \item Independent approximation (mesh vs.~basis) → cross-check
+  \item Agreement confirms robustness of mortality estimates
+\end{itemize}
+\end{column}
+\begin{column}{0.6\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/spde_post_u5m.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
 \begin{frame}{Contextual Heterogeneity: Correlations}
 \begin{columns}
 \begin{column}{0.5\textwidth}
 \begin{center}
-\includegraphics[width=.9\textwidth]{../results/figs/correlation_matrix.png}
+\fbox{\includegraphics[width=.8\textwidth]{../results/figs/correlation_matrix.png}}
 \end{center}
 \end{column}
 \begin{column}{0.5\textwidth}
@@ -507,200 +530,6 @@ if(!is.null(all_results)) {
   \item Generally consistent across modeling approaches
   \item Analytical method unstable for STAN Random baseline (0 denominator)
   \item Crossing method typically yields slightly higher estimates
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Robustness Assessment}
-<<robustness-display, results='asis'>>=
-if (!is.null(robustness_results)) {
-  # needs: library(dplyr); library(stringr)
-  rob_table <- robustness_results %>%
-    dplyr::mutate(
-      cv_display = sprintf("%.3f", cv),
-      range_display = sprintf("%.1f", range_width),
-      robust_display = dplyr::case_when(
-        robustness == "Very Robust" ~ "\\textcolor{ForestGreen}{Very Robust}",
-        robustness == "Robust" ~ "\\textcolor{blue}{Robust}",
-        robustness == "Moderately Robust" ~ "\\textcolor{orange}{Moderate}",
-        TRUE ~ "\\textcolor{red}{Not Robust}"
-      )
-    )
-
-  cat("\\begin{center}\n")
-  cat("\\begin{tabular}{llccc}\n")
-  cat("\\toprule\n")
-  cat("\\textbf{Model} & \\textbf{Method} & \\textbf{CV} & \\textbf{Range} & \\textbf{Assessment} \\\\\n")
-  cat("\\midrule\n")
-
-  for (i in seq_len(nrow(rob_table))) {
-    row <- rob_table[i, ]
-    cat(sprintf("%s & %s & %s & %s & %s \\\\\n",
-                row$model,
-                stringr::str_to_title(row$type),
-                row$cv_display,
-                row$range_display,
-                row$robust_display))
-  }
-
-  cat("\\bottomrule\n")
-  cat("\\end{tabular}\n")
-  cat("\\end{center}\n")
-
-  # Interpretation
-  mean_cv_u5mr <- mean(rob_table$cv[rob_table$model == "U5MR"], na.rm = TRUE)
-  mean_cv_imr  <- mean(rob_table$cv[rob_table$model == "IMR"],  na.rm = TRUE)
-
-  cat("\\vspace{0.3cm}\n")
-  cat("\\textbf{Interpretation:} Coefficient of variation (CV) measures relative dispersion across scenarios.\n")
-  cat("\\begin{itemize}\n")
-  cat(sprintf("\\item U5MR estimates: Average CV = %.3f\n", mean_cv_u5mr))
-  cat(sprintf("\\item IMR estimates: Average CV = %.3f\n",  mean_cv_imr))
-  cat("\\item CV $< 0.2$ indicates robust estimates\n")
-  cat("\\end{itemize}\n")
-
-} else {
-  cat("\\textbf{Robustness metrics:}\n")
-  cat("\\begin{itemize}\n")
-  cat("\\item Coefficient of variation across scenarios\n")
-  cat("\\item Range width assessment\n")
-  cat("\\item Model consistency evaluation\n")
-  cat("\\end{itemize}\n")
-}
-@
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Method Comparison}
-\begin{columns}
-\begin{column}{0.5\textwidth}
-<<method-comparison, results='asis'>>=
-if (!is.null(all_results)) {
-# 1) Aggregate across scenarios first (mean of medians), then widen
-  comparison <- all_results %>%
-    dplyr::filter(!is.na(median)) %>%
-    dplyr::group_by(model, type) %>%
-    dplyr::summarise(median = mean(median, na.rm = TRUE), .groups = "drop") %>%
-    tidyr::pivot_wider(names_from = type, values_from = median) %>%
-    dplyr::mutate(
-      # guard against divide-by-zero
-      analytical = ifelse(is.na(analytical) | analytical == 0, NA_real_, analytical),
-      diff = crossing - analytical,
-      pct_diff = 100 * diff / analytical
-    )
-
-  if (nrow(comparison) > 0) {
-    u5mr_diff <- comparison$pct_diff[comparison$model == "U5MR"]
-    imr_diff  <- comparison$pct_diff[comparison$model == "IMR"]
-
-    cat("\\textbf{Analytical vs Crossing:}\n")
-    cat("\\begin{itemize}\n")
-    if (length(u5mr_diff) > 0 && all(!is.na(u5mr_diff))) {
-      cat(sprintf("\\item U5MR: Crossing %.1f\\%% higher on average\n",
-                  mean(u5mr_diff, na.rm = TRUE)))
-    }
-    if (length(imr_diff) > 0 && all(!is.na(imr_diff))) {
-      cat(sprintf("\\item IMR: Crossing %.1f\\%% higher on average\n",
-                  mean(imr_diff, na.rm = TRUE)))
-    }
-    cat("\\end{itemize}\n")
-  }
-} else {
-  cat("\\textbf{Method comparison:}\n")
-  cat("\\begin{itemize}\n")
-  cat("\\item Analytical: Direct formula solution\n")
-  cat("\\item Crossing: Numerical intersection\n")
-  cat("\\item Generally consistent results\n")
-  cat("\\end{itemize}\n")
-}
-
-@
-
-\vspace{0.3cm}
-\textbf{Convergence diagnostics:}
-\begin{itemize}
-  \item Stan models: $\hat{R} < 1.01$
-  \item INLA models: Successful approximation
-  \item Effective sample sizes: $>1000$
-\end{itemize}
-\end{column}
-\begin{column}{0.5\textwidth}
-\textbf{Implications for policy:}
-\begin{itemize}
-  \item Threshold estimates robust across methods
-  \item Location exclusions show limited impact
-  \item Both analytical approaches converge
-  \item Conservative: Use crossing method upper bounds
-\end{itemize}
-
-\vspace{0.3cm}
-\textbf{Uncertainty sources:}
-\begin{itemize}
-  \item Sampling uncertainty (MCMC)
-  \item Model specification
-  \item Site heterogeneity  
-  \item Age pattern assumptions
-\end{itemize}
-\end{column}
-\end{columns}
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Conclusions}
-<<final-sensitivity-summary, results='asis'>>=
-if(!is.null(all_results) && !is.null(robustness_results)) {
-  # Get overall ranges
-  u5mr_range <- all_results %>% 
-    filter(model == "U5MR", !is.na(median)) %>% 
-    summarise(min_med = min(median), max_med = max(median))
-  
-  imr_range <- all_results %>% 
-    filter(model == "IMR", !is.na(median)) %>% 
-    summarise(min_med = min(median), max_med = max(median))
-  
-  # Most robust estimates
-  most_robust <- robustness_results %>% 
-    arrange(cv) %>% 
-    slice_head(n = 2)
-  
-  if(nrow(u5mr_range) > 0 && nrow(imr_range) > 0) {
-    cat(sprintf("\\textbf{Summary of sensitivity analysis:}"))
-    cat("\\begin{itemize}")
-    cat(sprintf("\\item U5MR thresholds range: %.1f - %.1f per 1,000", 
-                u5mr_range$min_med, u5mr_range$max_med))
-    cat(sprintf("\\item IMR thresholds range: %.1f - %.1f per 1,000", 
-                imr_range$min_med, imr_range$max_med))
-    cat("\\item Estimates show good consistency across scenarios")
-    cat("\\item Method differences are within uncertainty bounds")
-    cat("\\end{itemize}")
-  }
-  
-  if(nrow(most_robust) > 0) {
-    cat("\\vspace{0.3cm}")
-    cat("\\textbf{Most robust estimates:}")
-    cat("\\begin{enumerate}")
-    for(i in 1:nrow(most_robust)) {
-      row <- most_robust[i,]
-      cat(sprintf("\\item %s %s method (CV = %.3f)", 
-                  row$model, str_to_title(row$type), row$cv))
-    }
-    cat("\\end{enumerate}")
-  }
-  
-} else {
-  cat("\\textbf{Key findings:}")
-  cat("\\begin{itemize}")
-  cat("\\item Consistent thresholds across modeling approaches")
-  cat("\\item Limited sensitivity to site exclusions")
-  cat("\\item Both analytical and crossing methods converge")
-  cat("\\item Results support evidence-based cessation criteria")
-  cat("\\end{itemize}")
-}
-@
-
-\vspace{0.3cm}
-\textbf{Recommendations:}
-\begin{itemize}
-  \item Primary analysis provides robust point estimates
-  \item Use sensitivity bounds for conservative planning
-  \item Monitor resistance regardless of threshold approach
 \end{itemize}
 \end{frame}
 

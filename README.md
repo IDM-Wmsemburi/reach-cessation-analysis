@@ -100,13 +100,6 @@ read.csv("results/threshold_results.csv")
 load("results/enhanced_threshold_analysis.rda")
 ```
 
-## Policy Implications
-
-- **Data-driven thresholds** provide evidence-based foundation compared to current expert opinion-based guidance
-- **Robust estimates** across modeling approaches provide confidence for implementation  
-- **Resistance monitoring** remains essential regardless of threshold approach
-- **Full uncertainty quantification** enables risk-based decision making
-
 ## Methods Summary
 
 - **Bayesian spatial modeling** with HSGP approximation for computational efficiency

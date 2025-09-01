@@ -16,7 +16,7 @@ if (requireNamespace("rstudioapi", quietly = TRUE)) {
 # Load required libraries
 required_packages <- c(
   "dplyr", "tidyr", "tibble", "purrr", "sf", "ggokabeito",
-  "cmdstanr", "posterior", "bayesplot", "ggplot2", "showtext"
+  "cmdstanr", "posterior", "bayesplot", "ggplot2", "showtext", "INLA"
 )
 
 for (pkg in required_packages) {
@@ -666,8 +666,6 @@ results_dir <- "../../results"
 # Export CSV results
 readr::write_csv(age_decomp_summary, file.path(results_dir, "age_decomp_summary.csv"))
 
-
-
 cat("\n=== BASELINE MORTALITY ESTIMATION SUMMARY ===\n")
 print(age_decomp_summary)
 
@@ -677,99 +675,6 @@ cat("  - ../../results/baseline_mortality_estimates.rda\n")
 cat("  - ../../results/age_beta_priors_from_dhs.rda\n")
 
 cat("\nBaseline mortality estimation completed successfully!\n")
-
-library(ggplot2)
-library(ggokabeito)
-library(showtext)
-
-# One-time per session: fetch & register the font with showtext/sysfonts
-font_add_google("News Cycle", "News Cycle")
-showtext_auto()  # turn on showtext for all devices
-
-theme_clean <- function() {
-  theme_minimal(base_family = "News Cycle") +
-    theme(panel.grid.minor = element_blank(),
-          plot.title = element_text(face = "bold"),
-          axis.title = element_text(face = "bold"),
-          strip.text = element_text(face = "bold", size = rel(1), hjust = 0),
-          strip.background = element_rect(fill = "grey80", color = NA),
-          legend.title = element_text(face = "bold"))
-}
-
-plot_df <- df.mod %>%
-  mutate(trial_country = paste(trial_phase, country),
-         y_tilde = ifelse(trt == 0, y_159 + 0.5, NA),
-         log_h1_obs = ifelse(trt == 0 & y_tilde > 0 & E_yrs > 0,
-                             log((59/12) * (y_tilde / E_yrs)), NA),
-         log_h1_post = log(H1_total_pred_mean),
-         u5_obs = ifelse(!is.na(log_h1_obs), 1e3 * (1 - exp(-exp(log_h1_obs))), NA),
-         u5_post = 1e3 * (1 - exp(-exp(log_h1_post)))) %>%
-  select(trial_country, group_id, log_h1_obs, log_h1_post)
-
-dens_long <- plot_df %>%
-  rename(Observed = log_h1_obs, Posterior = log_h1_post) %>%
-  tidyr::pivot_longer(c(Observed, Posterior), names_to = "source", values_to = "log_h1") %>%
-  filter(!is.na(log_h1))
-dens_long_h <- dens_long %>% mutate(H1 = exp(log_h1))
-
-prior_df <- gp %>%
-  left_join(df.mod %>% distinct(group_id, trial_phase, country) %>%
-              mutate(trial_country = paste(trial_phase, country)),
-            by = "group_id") %>%
-  distinct(trial_country, group_id, .keep_all = TRUE) %>%
-  transmute(trial_country, group_id,
-            mu_prior, mu_prior_l = mu_prior - 1.96*sd_prior, mu_prior_u = mu_prior + 1.96*sd_prior)
-prior_df_h <- prior_df %>% mutate(mu_prior_H1 = exp(mu_prior),
-                                  mu_prior_H1_l = exp(mu_prior_l),
-                                  mu_prior_H1_u = exp(mu_prior_u))
-prior_df_u5m <- prior_df_h %>%
-  distinct(trial_country, mu_prior_H1, mu_prior_H1_l, mu_prior_H1_u) %>%
-  mutate(x   = 1e3*(1 - exp(-mu_prior_H1)),
-         x_l = 1e3*(1 - exp(-mu_prior_H1_l)),
-         x_u = 1e3*(1 - exp(-mu_prior_H1_u)),
-         label_ci = sprintf("%.1f (%.1f–%.1f)", x, x_l, x_u))
-
-x_range <- dens_long_h %>%
-  mutate(x = 1e3*(1 - exp(-H1))) %>%
-  group_by(trial_country) %>%
-  summarise(xmin = min(x, na.rm=TRUE), xmax = max(x, na.rm=TRUE), .groups="drop")
-
-prior_df_u5m2 <- prior_df_u5m %>%
-  left_join(x_range, by="trial_country") %>%
-  mutate(dx = 0.06*(xmax - xmin),
-         x_text = pmin(x + dx, xmax - 0.02*(xmax - xmin)),
-         y_text = Inf)
-
-final_plot <- tryCatch({
-  ggplot(dens_long_h, aes(x = 1e3*(1 - exp(-H1)), fill = source)) +
-    scale_fill_okabe_ito() +
-    scale_color_okabe_ito() +   
-    geom_rect(data = prior_df_u5m2,
-              aes(xmin=x_l, xmax=x_u, ymin=-Inf, ymax=Inf),
-              inherit.aes = FALSE, fill = "grey20", alpha = 0.3) +
-    geom_density(alpha = 0.6, adjust = 1) +
-    geom_vline(data = prior_df_u5m2, aes(xintercept = x),
-               linetype = "dashed", linewidth = 0.6, color = "black") +
-    geom_segment(data = prior_df_u5m2, aes(x=x_l, xend=x_u, y=0, yend=0),
-                 inherit.aes = FALSE, linewidth = 1, lineend = "round", color = "black") +
-    geom_text(data = prior_df_u5m2, aes(x=x_text, y=y_text, label=label_ci),
-              inherit.aes = FALSE, vjust = 1.2, hjust = 0, size = 3.3) +
-    facet_wrap(~ trial_country, scales = "free") +
-    labs(title = "Distribution of post-neonatal U5M: Observed vs Posterior HSGP + HS",
-         subtitle = "Dashed line and grey bar: trial-country prior and interval",
-         x = "Deaths per 1,000 surviving neonates", y = "Density", fill = NULL, color = NULL) +
-    scale_y_continuous(expand = expansion(mult = c(0.04, 0.18))) +
-    coord_cartesian(clip = "off") + theme_bw() + xlim(0, 250)  +
-    theme_clean() +
-    theme(legend.position = "top", plot.margin = margin(2, 2, 2, 2))
-}, error = function(e) { warning("Plot failed: ", e$message); NULL })
-
-
-figs_dir <- "../../results/figs"
-
-pdf(file.path(figs_dir, "prior_post_u5m.pdf"), width = 7, height = 5)
-if (!is.null(final_plot)) print(final_plot)
-dev.off()
 
 #########################################################################################
 ### Some maps of observed hazards, predicte hazard, predicted imr and predicted u5mr
@@ -882,4 +787,271 @@ get.surfaces.plot("AVENIR", "Niger")
 get.surfaces.plot("MORDOR I", "Tanzania")
 get.surfaces.plot("MORDOR I", "Malawi")
 get.surfaces.plot("CHAT", "Burkina Faso")
+
+#############################################################################
+# Lets create the posterior density plots but lets also include the 
+# INLA SPDE to compare with the HSGP + HS
+#############################################################################
+
+spde.surfaces <- list()
+
+get.spde.surface <- function(trial, cnt) {
+  message(paste("Getting INLA surfaces for", trial, cnt, "..."))
+  
+  # Observed: all clusters for prediction
+  data_obs <- data_analysis %>%
+    filter(trial_phase == trial, country == cnt)
+  
+  print("Creating INLA mesh for SPDE")
+  
+  coords_obs <- as.matrix(data_obs %>% select(longitude, latitude))
+  
+  # Fit: placebo-only clusters
+  data_fit <- data_obs %>% filter(trt == 0) %>% mutate(log_offset = log(person_time))
+  coords_fit <- as.matrix(data_fit %>% select(longitude, latitude))
+  
+  # Mesh and SPDE
+  mesh <- inla.mesh.2d(loc = coords_fit, max.edge = c(0.1, 0.5), cutoff = 0.05)
+  spde <- inla.spde2.pcmatern(mesh, prior.range = c(1.2, 0.5), prior.sigma = c(0.3, 0.5))
+  A_fit <- inla.spde.make.A(mesh = mesh, loc = coords_fit)
+  A_pred <- inla.spde.make.A(mesh = mesh, loc = coords_obs)
+  s.index <- inla.spde.make.index("spatial", spde$n.spde)
+  
+  # Stack for fitting (placebo only)
+  stack_fit <- inla.stack(
+    data = list(y = data_fit$n),
+    A = list(A_fit, 1),
+    effects = list(spatial = s.index, intercept = rep(1, nrow(data_fit))),
+    tag = "fit"
+  )
+  
+  # Stack for prediction (all clusters)
+  stack_pred <- inla.stack(
+    data = list(y = NA),
+    A = list(A_pred, 1),
+    effects = list(spatial = s.index, intercept = rep(1, nrow(data_obs))),
+    tag = "pred"
+  )
+  
+  stack_full <- inla.stack(stack_fit, stack_pred)
+  
+  print("Fitting INLA model")
+  
+  # Fit model
+  formula <- y ~ 0 + intercept + f(spatial, model = spde)
+  
+  fit <- inla(
+    formula,
+    family = "nbinomial",  # <-- change here
+    data = inla.stack.data(stack_full),
+    control.predictor = list(A = inla.stack.A(stack_full), compute = TRUE),
+    E = c(data_fit$person_time, rep(1, nrow(data_obs))),
+    control.family = list(  # <-- use this to estimate overdispersion
+      list(hyper = list(theta = list(prior = "loggamma", param = c(1, 0.01))))
+    )
+  )
+  
+  # Extract predictions for all clusters
+  idx_pred <- inla.stack.index(stack_full, "pred")$data
+  fitted_vals <- fit$summary.fitted.values[idx_pred, ]
+  
+  print("Creating data frame")
+  
+ data_obs %>%
+    mutate(
+      log_spde = log(59/12) + fitted_vals$mean) %>%
+    select(community_id, latitude, longitude, trial_phase, country, log_spde)
+}
+
+data_analysis <-   data_crt_geospatial |>
+  filter(!is.na(trt), !is.na(latitude), !is.na(longitude), !is.na(person_time)) |> 
+  mutate(person_time = person_time/365.25) |>
+  group_by(community_id, latitude, longitude, trt, trial_phase, country) |> 
+  summarize(n = sum(n), person_time = sum(person_time), .groups = "drop") |> 
+  mutate(trial_phase = ifelse(country == "Niger" & trial_phase != "AVENIR", "MORDOR I/II", trial_phase))
+
+# Get all the SPDE surfaces
+
+spde.surfaces[[1]] <- get.spde.surface("MORDOR I/II", "Niger")
+spde.surfaces[[2]] <- get.spde.surface("AVENIR", "Niger")
+spde.surfaces[[3]] <- get.spde.surface("MORDOR I", "Tanzania")
+spde.surfaces[[4]] <- get.spde.surface("MORDOR I", "Malawi")
+spde.surfaces[[5]] <- get.spde.surface("CHAT", "Burkina Faso")
+
+spde.surfaces.df <- data.table::rbindlist(spde.surfaces)
+
+plot_df <- df.mod %>%
+  left_join(spde.surfaces.df) |>
+  mutate(trial_country = paste(trial_phase, country),
+         y_tilde = ifelse(trt == 0, y_159 + 0.5, NA),
+         log_h1_obs = ifelse(trt == 0 & y_tilde > 0 & E_yrs > 0,
+                             log((59/12) * (y_tilde / E_yrs)), NA),
+         log_h1_post = log(H1_total_pred_mean),
+         log_h1_spde = log_spde, 
+         u5_obs = ifelse(!is.na(log_h1_obs), 1e3 * (1 - exp(-exp(log_h1_obs))), NA),
+         u5_post = 1e3 * (1 - exp(-exp(log_h1_post)))) %>%
+  select(trial_country, group_id, log_h1_obs, log_h1_post, log_h1_spde)
+
+dens_long <- plot_df %>%
+  rename(Observed = log_h1_obs, Posterior = log_h1_post, SPDE = log_h1_spde) %>%
+  tidyr::pivot_longer(c(Observed, Posterior, SPDE), names_to = "source", values_to = "log_h1") %>%
+  filter(!is.na(log_h1))
+dens_long_h <- dens_long %>% mutate(H1 = exp(log_h1))
+
+prior_df <- gp %>%
+  left_join(df.mod %>% distinct(group_id, trial_phase, country) %>%
+              mutate(trial_country = paste(trial_phase, country)),
+            by = "group_id") %>%
+  distinct(trial_country, group_id, .keep_all = TRUE) %>%
+  transmute(trial_country, group_id,
+            mu_prior, mu_prior_l = mu_prior - 1.96*sd_prior, mu_prior_u = mu_prior + 1.96*sd_prior)
+prior_df_h <- prior_df %>% mutate(mu_prior_H1 = exp(mu_prior),
+                                  mu_prior_H1_l = exp(mu_prior_l),
+                                  mu_prior_H1_u = exp(mu_prior_u))
+prior_df_u5m <- prior_df_h %>%
+  distinct(trial_country, mu_prior_H1, mu_prior_H1_l, mu_prior_H1_u) %>%
+  mutate(x   = 1e3*(1 - exp(-mu_prior_H1)),
+         x_l = 1e3*(1 - exp(-mu_prior_H1_l)),
+         x_u = 1e3*(1 - exp(-mu_prior_H1_u)),
+         label_ci = sprintf("%.1f (%.1f–%.1f)", x, x_l, x_u))
+
+x_range <- dens_long_h %>%
+  mutate(x = 1e3*(1 - exp(-H1))) %>%
+  group_by(trial_country) %>%
+  summarise(xmin = min(x, na.rm=TRUE), xmax = max(x, na.rm=TRUE), .groups="drop")
+
+prior_df_u5m2 <- prior_df_u5m %>%
+  left_join(x_range, by="trial_country") %>%
+  mutate(dx = 0.06*(xmax - xmin),
+         x_text = pmin(x + dx, xmax - 0.02*(xmax - xmin)),
+         y_text = Inf)
+
+library(ggplot2)
+
+plot_theme <- function() {
+  theme_bw() +
+    theme(
+      legend.position = "top",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 10),
+      legend.margin = margin(b = 5),
+      plot.title = element_text(size = 11, face = "bold"),
+      plot.subtitle = element_text(size = 9, color = "grey40"),
+      axis.title = element_text(size = 10),
+      axis.text = element_text(size = 9),
+      strip.text = element_text(size = 10, face = "bold"),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(color = "grey90", size = 0.3),
+      strip.background = element_rect(fill = "grey95", color = "grey80"),
+      plot.margin = margin(5, 10, 5, 10)
+    )
+}
+
+# Plot 1: Observed vs Posterior vs Prior
+plot1 <- tryCatch({
+  # Filter data for first plot
+  dens_plot1 <- dens_long_h %>% 
+    filter(source %in% c("Observed", "Posterior"))
+  
+  ggplot(dens_plot1, aes(x = 1e3*(1 - exp(-H1)), fill = source)) +
+    # Prior interval background
+    geom_rect(data = prior_df_u5m2,
+              aes(xmin=x_l, xmax=x_u, ymin=-Inf, ymax=Inf),
+              inherit.aes = FALSE, fill = "grey70", alpha = 0.3) +
+    
+    # Density curves
+    geom_density(alpha = 0.7, adjust = 1, size = 0.5) +
+    
+    # Prior mean line
+    geom_vline(data = prior_df_u5m2, aes(xintercept = x),
+               linetype = "dashed", linewidth = 0.8, color = "black") +
+    
+    # Prior interval marker at bottom
+    geom_segment(data = prior_df_u5m2, aes(x=x_l, xend=x_u, y=0, yend=0),
+                 inherit.aes = FALSE, linewidth = 2, lineend = "round", color = "black") +
+    
+    # Prior CI labels
+    geom_text(data = prior_df_u5m2, 
+              aes(x = 5, y = Inf, label = paste0("Prior: ", label_ci)),
+              inherit.aes = FALSE, 
+              vjust = 1.3, hjust = 0, 
+              size = 3, color = "black") +
+    
+    # Colors for observed vs posterior
+    scale_fill_manual(values = c("Observed" = "#E69F00", 
+                                 "Posterior" = "#0072B2"),
+                      labels = c("Observed data", 
+                                 "Model posterior")) +
+    
+    facet_wrap(~ trial_country, scales = "free", ncol = 3) +
+    
+    labs(title = "Observed Data vs Model Posterior",
+         subtitle = "Grey area and dashed line show prior distribution",
+         x = NULL,  # Remove x-axis title from top plot
+         y = "Density") +
+    
+    scale_x_continuous(limits = c(0, 250)) +
+    scale_y_continuous(expand = expansion(mult = c(0.02, 0.20))) +
+    
+    plot_theme()
+}, error = function(e) { 
+  warning("Plot 1 failed: ", e$message); 
+  NULL 
+})
+
+# Plot 2: Posterior vs SPDE vs Prior  
+plot2 <- tryCatch({
+  # Filter data for second plot
+  dens_plot2 <- dens_long_h %>% 
+    filter(source %in% c("Posterior", "SPDE"))
+  
+  ggplot(dens_plot2, aes(x = 1e3*(1 - exp(-H1)), fill = source)) +
+    # Prior interval background
+    geom_rect(data = prior_df_u5m2,
+              aes(xmin=x_l, xmax=x_u, ymin=-Inf, ymax=Inf),
+              inherit.aes = FALSE, fill = "grey70", alpha = 0.3) +
+    
+    # Density curves
+    geom_density(alpha = 0.7, adjust = 1, size = 0.5) +
+    
+    # Prior mean line
+    geom_vline(data = prior_df_u5m2, aes(xintercept = x),
+               linetype = "dashed", linewidth = 0.8, color = "black") +
+    
+    # Prior interval marker at bottom
+    geom_segment(data = prior_df_u5m2, aes(x=x_l, xend=x_u, y=0, yend=0),
+                 inherit.aes = FALSE, linewidth = 2, lineend = "round", color = "black") +
+    
+
+    # Colors for posterior vs SPDE
+    scale_fill_manual(values = c("Posterior" = "#0072B2",
+                                 "SPDE" = "#009E73"),
+                      labels = c("Model posterior", 
+                                 "SPDE comparison")) +
+    
+    facet_wrap(~ trial_country, scales = "free", ncol = 3) +
+    
+    labs(title = "Model Posterior vs SPDE Method",
+         subtitle = "Grey area and dashed line show prior distribution",
+         x = "Deaths per 1,000 surviving neonates", 
+         y = "Density") +
+    
+    scale_y_continuous(expand = expansion(mult = c(0.02, 0.20))) +
+    
+    plot_theme()
+}, error = function(e) { 
+  warning("Plot 2 failed: ", e$message); 
+  NULL 
+})
+
+
+figs_dir <- "../../results/figs"
+
+pdf(file.path(figs_dir, "prior_post_u5m.pdf"), width = 7, height = 5)
+if (!is.null(plot1)) print(plot1)
+dev.off()
+
+pdf(file.path(figs_dir, "spde_post_u5m.pdf"), width = 7, height = 5)
+if (!is.null(plot2)) print(plot2)
+dev.off()
 

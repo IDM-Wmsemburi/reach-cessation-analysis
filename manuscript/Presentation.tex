@@ -60,6 +60,11 @@
 \usepackage{booktabs} 
 \usepackage[dvipsnames]{xcolor} 
 \definecolor{ForestGreen}{RGB}{34,139,34}
+\usepackage{xcolor}
+\definecolor{ObsOrange}{HTML}{E69F00}   % "Observed"
+\definecolor{PostBlue}{HTML}{0072B2}    % "Posterior"
+\definecolor{SpdeGreen}{HTML}{009E73}   % "SPDE"
+\definecolor{PriorGray}{gray}{0.70}     % prior band (≈ grey70)
 
 %\setbeameroption{show notes on second screen=right}
 \setbeamersize{text margin left=0.5cm,text margin right=0.5cm}
@@ -246,12 +251,12 @@ MORDOR I/II & Niger & 594 & 400,111 & 5,253 & 205,360 \\
 \begin{frame}{Baseline Mortality Patterns}
 \begin{columns}
 \begin{column}{0.4\textwidth}
-\textbf{Spatial Model $\mu_i = 1e3*(1 - exp(-H_{i,1}^{59}))$:}
+\textbf{Spatial Model $\mu_i = 1000 \times (1 - \exp(-H_{i,1}^{59}))$:}
 \begin{itemize}
-  \item Orange: Raw cluster estimates 
-  \item Blue: Posterior cluster means
-  \item Dashed (and grey): Trial-country priors
-  \item Text (median and CrI): Trial-country priors
+  \item \textcolor{ObsOrange}{Observed data}: raw cluster estimates (placebo)
+  \item \textcolor{PostBlue}{Posterior}: cluster posterior means
+  \item \textcolor{PriorGray}{Prior}: trial–country prior (shaded band) with
+        dashed prior mean (text labels also prior mean and 95\% CI)
 \end{itemize}
 \end{column}
 \begin{column}{0.6\textwidth}
@@ -262,11 +267,29 @@ MORDOR I/II & Niger & 594 & 400,111 & 5,253 & 205,360 \\
 \end{columns}
 \end{frame}
 
+\begin{frame}{Validating HSGP + HS using SPDE}
+\begin{columns}
+\begin{column}{0.4\textwidth}
+\begin{itemize}
+  \item \textcolor{SpdeGreen}{SPDE posteriors} closely overlap \textcolor{PostBlue}{HSGP + HS}
+  \item Both recover similar distributional shapes across clusters
+  \item Independent approximation (mesh vs.~basis) → cross-check
+  \item Agreement confirms robustness of mortality estimates
+\end{itemize}
+\end{column}
+\begin{column}{0.6\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/spde_post_u5m.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
 \begin{frame}{Contextual Heterogeneity: Correlations}
 \begin{columns}
 \begin{column}{0.5\textwidth}
 \begin{center}
-\includegraphics[width=.9\textwidth]{../results/figs/correlation_matrix.png}
+\fbox{\includegraphics[width=.8\textwidth]{../results/figs/correlation_matrix.png}}
 \end{center}
 \end{column}
 \begin{column}{0.5\textwidth}
@@ -447,80 +470,6 @@ Find $U^*$ where $\lambda_{\text{treatment}}(U^*) = \lambda_{\text{placebo}}(U^*
   \item Generally consistent across modeling approaches
   \item Analytical method unstable for STAN Random baseline (0 denominator)
   \item Crossing method typically yields slightly higher estimates
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Robustness Assessment}
-\begin{center}
-\begin{tabular}{llccc}
-\toprule
-\textbf{Model} & \textbf{Method} & \textbf{CV} & \textbf{Range} & \textbf{Assessment} \\
-\midrule
-IMR & Analytical & 0.153 & 14.4 & \textcolor{blue}{Robust} \\
-IMR & Crossing & 0.083 & 7.7 & \textcolor{ForestGreen}{Very Robust} \\
-U5MR & Analytical & 0.162 & 27.0 & \textcolor{blue}{Robust} \\
-U5MR & Crossing & 0.078 & 13.3 & \textcolor{ForestGreen}{Very Robust} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.3cm}
-\textbf{Interpretation:} Coefficient of variation (CV) measures relative dispersion across scenarios.
-\begin{itemize}
-\item U5MR estimates: Average CV = 0.120
-\item IMR estimates: Average CV = 0.118
-\item CV $< 0.2$ indicates robust estimates
-\end{itemize}
-
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Method Comparison}
-\begin{columns}
-\begin{column}{0.5\textwidth}
-\textbf{Analytical vs Crossing:}
-\begin{itemize}
-\item U5MR: Crossing 4.3\% higher on average
-\item IMR: Crossing 3.7\% higher on average
-\end{itemize}
-
-
-\vspace{0.3cm}
-\textbf{Convergence diagnostics:}
-\begin{itemize}
-  \item Stan models: $\hat{R} < 1.01$
-  \item INLA models: Successful approximation
-  \item Effective sample sizes: $>1000$
-\end{itemize}
-\end{column}
-\begin{column}{0.5\textwidth}
-\textbf{Implications for policy:}
-\begin{itemize}
-  \item Threshold estimates robust across methods
-  \item Location exclusions show limited impact
-  \item Both analytical approaches converge
-  \item Conservative: Use crossing method upper bounds
-\end{itemize}
-
-\vspace{0.3cm}
-\textbf{Uncertainty sources:}
-\begin{itemize}
-  \item Sampling uncertainty (MCMC)
-  \item Model specification
-  \item Site heterogeneity  
-  \item Age pattern assumptions
-\end{itemize}
-\end{column}
-\end{columns}
-\end{frame}
-
-\begin{frame}{Sensitivity Analysis: Conclusions}
-\textbf{Summary of sensitivity analysis:}\begin{itemize}\item U5MR thresholds range: 33.6 - 61.1 per 1,000\item IMR thresholds range: 19.7 - 34.4 per 1,000\item Estimates show good consistency across scenarios\item Method differences are within uncertainty bounds\end{itemize}\vspace{0.3cm}\textbf{Most robust estimates:}\begin{enumerate}\item U5MR Crossing method (CV = 0.078)\item IMR Crossing method (CV = 0.083)\end{enumerate}
-
-\vspace{0.3cm}
-\textbf{Recommendations:}
-\begin{itemize}
-  \item Primary analysis provides robust point estimates
-  \item Use sensitivity bounds for conservative planning
-  \item Monitor resistance regardless of threshold approach
 \end{itemize}
 \end{frame}
 
