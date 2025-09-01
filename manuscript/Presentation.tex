@@ -1,0 +1,575 @@
+\documentclass[aspectratio=169]{beamer}\usepackage[]{graphicx}\usepackage[dvipsnames]{xcolor}
+% maxwidth is the original width if it is less than linewidth
+% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
+\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
+\newcommand{\hlsng}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
+\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hldef}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
+\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
+\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
+\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
+\let\hlipl\hlkwb
+
+\usepackage{framed}
+\makeatletter
+\newenvironment{kframe}{%
+ \def\at@end@of@kframe{}%
+ \ifinner\ifhmode%
+  \def\at@end@of@kframe{\end{minipage}}%
+  \begin{minipage}{\columnwidth}%
+ \fi\fi%
+ \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
+ \colorbox{shadecolor}{##1}\hskip-\fboxsep
+     % There is no \\@totalrightmargin, so:
+     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
+ \MakeFramed {\advance\hsize-\width
+   \@totalleftmargin\z@ \linewidth\hsize
+   \@setminipage}}%
+ {\par\unskip\endMakeFramed%
+ \at@end@of@kframe}
+\makeatother
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
+
+\usepackage{alltt}
+\usepackage{utils/theme}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{tikz}
+\usepackage{pdfpages}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs} 
+\usepackage[dvipsnames]{xcolor} 
+\definecolor{ForestGreen}{RGB}{34,139,34}
+
+%\setbeameroption{show notes on second screen=right}
+\setbeamersize{text margin left=0.5cm,text margin right=0.5cm}
+
+\title{REACH Secondary Analysis: Evidence-Based Cessation Thresholds for Azithromycin MDA}
+\author{William Msemburi}
+\date{August, 2025}
+
+
+
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\begin{document}
+\includepdf[pages=1]{utils/cover.pdf}	
+
+% Table of Contents
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+% -------------------------------
+\section{Introduction}
+
+\begin{frame}{Background}
+\begin{itemize}
+  \item Child mortality remains high in sub-Saharan Africa;
+  \item MDA with azithromycin has emerged as promising intervention beyond trachoma;
+  \item MORDOR trial: 13.5\% reduction in under-five mortality with biannual treatment;
+  \item \textbf{But:} Benefits not consistent across all settings
+  \item \textbf{Concerns:} Antimicrobial resistance with repeated exposure
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Current WHO guidance (2020):} IMR $\geq$ 60/1,000 or U5MR $\geq$ 80/1,000 - thresholds based on expert opinion, not trial data. 
+
+\vspace{0.3cm}
+\textbf{This study:} First data-driven foundation for cessation criteria using comprehensive trial data
+\end{frame}
+
+
+
+% -------------------------------
+\section{Methods}
+
+\begin{frame}{Analytical Roadmap: Objectives}
+\textbf{Five interconnected goals}
+
+\begin{enumerate}
+  \item \textbf{Reference age patterns}: derive robust neonatal, infant, and child hazard profiles from DHS birth histories.
+  \item \textbf{De-noised and spatially coherent baseline mortality}: generate accurate cluster-level estimates of underlying mortality from sparse REACH trial data.
+  \item \textbf{Contextual heterogeneity}: assess whether immunization coverage and malaria burden explain baseline variation and/or systematically modify treatment effects.
+  \item \textbf{Decision-ready thresholds}: identify mortality levels where azithromycin no longer improves survival.
+\end{enumerate}
+
+\vspace{0.4cm}
+\textbf{Data integration:} DHS birth histories (17 surveys), REACH trial mortality/person-time/coordinates, and contextual indicators (IHME immunization, Malaria Atlas).
+\end{frame}
+
+\begin{frame}{Stage 1: Demographic Age Patterns}
+\textbf{Goal:} Establish reliable age profiles for mortality hazards and a robust neonatal to post-neonatal bridge.
+
+\begin{itemize}
+  \item Convert DHS age-specific death probabilities to cumulative hazards:
+        $H_a = -n_a \log(1 - p_a)$ across standard age bands.
+  \item Pooled log-log regression with country intercepts to model neonatal hazard as function of early and late post-neonatal mortality:
+        \[
+          \log H_0 = \alpha_{\text{country}} + \beta_1 \log H_{1\text{--}11}
+                     + \beta_2 \log H_{12\text{--}59} + \epsilon
+        \]
+  \item Output: age pattern priors and quantified uncertainty to inform trial-based modeling.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Stage 2: Trial-Anchored Baseline Mortality}
+\textbf{Goal:} Calibrate demographic priors to observed placebo data.
+
+\begin{itemize}
+  \item \textbf{Baseline hazard (1--59m):}  
+        Fit a \emph{quasi-Poisson GLM with offset and cluster-robust SEs} on placebo clusters:  
+        \[
+        \log \mathrm{E}[y_c] = \alpha_g + \log E_c
+        \]
+        where $y_c$ = observed deaths, $E_c$ = person-time.  
+        Produces trial--country baseline hazard priors with uncertainty.
+
+  \item \textbf{Age split (1--11 vs 12--59m):}  
+        Update DHS Beta prior with observed placebo deaths by age group:  
+        \[
+        p_g \mid \text{data} \sim \text{Beta}(\alpha_{g,0} + d_{g,1-11},\;\beta_{g,0} + d_{g,12-59})
+        \]
+        giving the fraction of under-five hazard in 1--11m.
+
+  \item \textbf{Outputs:} Group-specific hazard priors ($\mu_g$) and calibrated age shares ($p_g$), passed forward to the hierarchical spatial model.
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Stage 3: Bayesian Spatial Mortality Estimation}
+\textbf{Goal:} Derive spatially coherent cluster-level IMR and U5MR.
+
+\[
+y_i \sim \text{Poisson}(E_i \exp\{\lambda_i\}), \quad
+\lambda_i = \mu_{g[i]} + u(\mathbf{s}_i) + v_i
+\]
+
+\begin{itemize}
+  \item $u(\mathbf{s})$: Hilbert Space Gaussian Process (HSGP) approximation to a Matérn-3/2 field.
+  \item $v_i$: cluster-specific deviations with a regularized horseshoe prior (adaptive shrinkage).
+  \item Age decomposition: combine trial deaths and DHS bridge to recover neonatal, infant, and child hazards.
+  \item Outputs: posterior distributions for cluster-level IMR and U5MR.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Stage 4: Contextual Heterogeneity}
+\textbf{Goal:} Test whether context explains baseline mortality or modifies treatment effects.
+
+Nested models (Poisson GLMM with age spline $f(a)$ and exposure offset):
+\begin{align*}
+  \text{Base:} &\quad \log \mu_{iat} = \log E_{iat} + \beta_0 + f(a) + b_i \\
+  \text{+Covariate:} &\quad \log \mu_{iat} = \ldots + \beta_1 x_i \\
+  \text{+Interaction:} &\quad \log \mu_{iat} = \ldots + \beta_2 T_i + \beta_3 (x_i \times T_i)
+\end{align*}
+
+\begin{itemize}
+  \item Covariates: immunization gaps (DPT1–3, MCV1, BCG, Polio3) and malaria indicators (ITN, incidence, mortality).
+  \item Likelihood ratio tests compare nested models to assess explanatory vs modifying effects.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Stage 5: Cessation Thresholds via Posterior Crossings}
+\textbf{Goal:} Identify mortality levels where azithromycin benefits vanish.
+
+\begin{itemize}
+  \item Poisson interaction model with baseline mortality on log scale:
+\end{itemize}
+
+\[
+y_i \sim \text{Poisson}(\lambda_i t_i), \qquad
+\log \lambda_i = \alpha_{g[i]} + \beta_U U_i + \text{trt}_i\big(\beta_T + \beta_{U\times T} U_i\big)
+\]
+
+\noindent where:
+\begin{description}[leftmargin=1.5em]
+  \item[$y_i$] observed deaths in cluster $i$
+  \item[$t_i$] person-time (exposure offset)
+  \item[$\text{trt}_i$] treatment indicator ($0/1$)
+  \item[$U_i$] latent baseline log mortality (sampled from baselines posterior)
+  \item[$\alpha_{g[i]}$] group-level intercept
+\end{description}
+
+\begin{itemize}
+  \item Posterior predictive rates generated on dense mortality grid by treatment arm.
+  \item Threshold $U^*$ is by draw mortality level where predicted curves cross.
+  \item Output: distribution of cessation thresholds (median, CrI) for IMR/U5MR.
+\end{itemize}
+\end{frame}
+
+
+% -------------------------------
+\section{Results}
+
+\begin{frame}{Study Population}
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+Trial & Country & Clusters & Children & Deaths & Person-years \\
+\midrule
+AVENIR & Niger & 2,158 & 619,228 & 3,837 & 298,683 \\
+CHAT & Burkina Faso & 285 & 237,434 & 1,086 & 119,139 \\
+MORDOR I & Malawi & 304 & 240,384 & 1,044 & 108,009 \\
+MORDOR I & Tanzania & 613 & 131,095 & 360 & 63,127 \\
+MORDOR I/II & Niger & 594 & 400,111 & 5,253 & 205,360 \\
+\midrule
+\textbf{Total} & & \textbf{3,954} & \textbf{1.63M} & \textbf{11,580} & \textbf{794,318} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\textbf{Coverage:} Ages 1-59 months across diverse epidemiological contexts
+
+\textbf{Validation:} Denominators match original trial publications
+\end{frame}
+
+\begin{frame}{Baseline Mortality Patterns}
+\begin{columns}
+\begin{column}{0.4\textwidth}
+\textbf{Spatial Model $\mu_i = 1e3*(1 - exp(-H_{i,1}^{59}))$:}
+\begin{itemize}
+  \item Orange: Raw cluster estimates 
+  \item Blue: Posterior cluster means
+  \item Dashed (and grey): Trial-country priors
+  \item Text (median and CrI): Trial-country priors
+\end{itemize}
+\end{column}
+\begin{column}{0.6\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/prior_post_u5m.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Contextual Heterogeneity: Correlations}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\includegraphics[width=.9\textwidth]{../results/figs/correlation_matrix.png}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+  \item Immunization variables use vaccination gap (1 - coverage) 
+  \item Vaccination coverage generally strongly correlated with mortality
+  \item Malaria burden positively associated
+  \item Strong correlations between related indicators
+\end{itemize}
+Strong correlation between many of the indicators.
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Contextual Heterogeneity: Treatment Interactions}
+\begin{center}
+\includegraphics[width=0.95\textwidth]{../results/figs/contextual_pvalue_heatmap.png}
+\end{center}
+\end{frame}
+
+\begin{frame}{Cessation Thresholds: Main Results}
+\begin{columns}
+\begin{column}{0.35\textwidth}
+
+Based on posterior crossings:
+\begin{itemize}
+\item \textbf{U5MR:} 47.8 per 1,000 live births (95\% CI: 35.8-72.0)
+\item \textbf{IMR:} 26.6 per 1,000 live births (95\% CI: 20.3-37.9)
+\item \textbf{Interpretation:} Treatment benefits vanish when mortality falls below these levels
+\end{itemize}
+\end{column}
+\begin{column}{0.65\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/threshold_analysis_plots.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Cessation Thresholds: Model Evidence}
+\begin{columns}
+\begin{column}{0.35\textwidth}
+\textbf{Statistical evidence:}
+\begin{itemize}
+  \item Clear treatment-mortality interactions
+  \item Negative interaction terms confirm diminishing benefits
+  \item Threshold densities appropriately skewed
+  \item Wider uncertainty in IMR effects
+\end{itemize}
+\end{column}
+\begin{column}{0.6\textwidth}
+\begin{center}
+\includegraphics[width=.95\textwidth]{../results/figs/regression_densities.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Model Fit: U5MR Predictions}
+\begin{columns}
+\begin{column}{0.35\textwidth}
+\textbf{Crossing visualization:}
+\begin{itemize}
+  \item Thick dashed line: threshold median
+  \item Dotted lines: credible intervals
+  \item Clear convergence of treatment/placebo curves
+  \item Benefits above threshold, minimal below
+\end{itemize}
+\end{column}
+\begin{column}{0.65\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/threshold_u5mr.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Model Fit: IMR Predictions}
+\begin{columns}
+\begin{column}{0.35\textwidth}
+\textbf{Similar pattern to U5MR:}
+\begin{itemize}
+  \item Clear treatment-placebo convergence
+  \item Narrower intervals at lower mortality
+  \item Consistent evidence for threshold effects
+\end{itemize}
+\end{column}
+\begin{column}{0.65\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{../results/figs/threshold_imr.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\section{Sensitivity analysis}
+
+\begin{frame}{Sensitivity Analysis: Mathematical Framework}
+\textbf{Two approaches to threshold estimation:}
+
+\vspace{0.3cm}
+\textbf{1. Analytical Method:}
+From the interaction model: $\log \lambda_i = \alpha + \beta_m U_i + \text{trt}_i(\beta_t + \beta_{mt} U_i)$
+
+Treatment effect becomes zero when: $\beta_t + \beta_{mt} U^* = 0$
+
+Solving: $U^* = -\frac{\beta_t}{\beta_{mt}}$ (threshold on log-mortality scale)
+
+\vspace{0.3cm}
+\textbf{2. Crossing Method:}
+Generate predicted rates on dense mortality grid:
+\begin{align*}
+\lambda_{\text{placebo}}(U) &= \exp(\alpha + \beta_m U) \\
+\lambda_{\text{treatment}}(U) &= \exp(\alpha + \beta_m U + \beta_t + \beta_{mt} U)
+\end{align*}
+
+Find $U^*$ where $\lambda_{\text{treatment}}(U^*) = \lambda_{\text{placebo}}(U^*)$
+
+\vspace{0.3cm}
+\textbf{Both methods:} Full posterior uncertainty via MCMC draws
+\end{frame}
+
+\begin{frame}{Sensitivity Analysis: Model Scenarios}
+
+
+\textbf{Comprehensive robustness testing across 8 scenarios:}
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{Stan Models:}
+\begin{itemize}
+  \item Random Baseline (group-specific)
+  \item Fixed Baseline (pooled)
+\end{itemize}
+
+\textbf{INLA Models:}
+\begin{itemize}
+  \item All trial data
+  \item Sequential exclusions by location
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Exclusion Scenarios:}
+\begin{itemize}
+  \item Niger MORDOR
+  \item Niger AVENIR  
+  \item Tanzania MORDOR
+  \item Malawi MORDOR
+  \item Burkina Faso CHAT
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{0.3cm}
+\textbf{Purpose:} Test sensitivity to influential sites and modeling assumptions
+\end{frame}
+
+\begin{frame}{Ranked Threshold Densities}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\includegraphics[width=.95\textwidth]{../results/figs/analytical_threshold_densities.pdf}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\includegraphics[width=.95\textwidth]{../results/figs/crossing_threshold_densities.pdf}
+\end{center}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Sensitivity Analysis: Summary Threshold Distributions}
+\begin{center}\footnotesize\begin{tabular}{l|cc|cc}\toprule& \multicolumn{2}{c}{\textbf{U5MR}} & \multicolumn{2}{c}{\textbf{IMR}} \\\textbf{Scenario} & Analytical & Crossing & Analytical & Crossing \\\midrule STAN Random Baseline & 33.6 (0.0-3257.3) & 47.8 (35.8-72.0) & 19.7 (0.0-10912.0) & 26.6 (20.3-37.9) \\STAN Fixed Baseline & 53.8 (30.7-69.9) & 54.4 (37.6-70.1) & 29.5 (17.4-37.2) & 29.9 (21.3-37.3) \\INLA All & 53.3 (30.2-69.6) & 53.9 (37.7-69.6) & 29.9 (17.5-37.4) & 30.2 (21.4-37.5) \\INLA -Niger MORDOR & 60.2 (49.3-67.6) & 60.2 (49.4-67.6) & 33.2 (27.6-36.7) & 33.2 (27.7-36.7) \\INLA -Niger AVENIR & 60.6 (29.9-81.9) & 61.1 (38.8-82.1) & 34.2 (18.5-43.6) & 34.4 (22.5-43.7) \\INLA -Tanzania MORDOR & 57.0 (32.6-73.4) & 57.4 (39.2-73.5) & 30.7 (18.7-38.6) & 31.0 (21.4-38.7) \\INLA -Malawi MORDOR & 50.7 (24.4-68.5) & 52.3 (36.6-68.9) & 28.0 (13.7-36.5) & 28.7 (20.8-36.7) \\INLA -Burkina CHAT & 55.9 (29.6-73.7) & 56.5 (37.6-74.0) & 32.9 (20.2-41.0) & 33.0 (23.1-41.1) \\\bottomrule\end{tabular}\end{center}
+
+\vspace{0.3cm}
+\begin{itemize}
+  \item Generally consistent across modeling approaches
+  \item Analytical method unstable for STAN Random baseline (0 denominator)
+  \item Crossing method typically yields slightly higher estimates
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Sensitivity Analysis: Robustness Assessment}
+\begin{center}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Model} & \textbf{Method} & \textbf{CV} & \textbf{Range} & \textbf{Assessment} \\
+\midrule
+IMR & Analytical & 0.153 & 14.4 & \textcolor{blue}{Robust} \\
+IMR & Crossing & 0.083 & 7.7 & \textcolor{ForestGreen}{Very Robust} \\
+U5MR & Analytical & 0.162 & 27.0 & \textcolor{blue}{Robust} \\
+U5MR & Crossing & 0.078 & 13.3 & \textcolor{ForestGreen}{Very Robust} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\textbf{Interpretation:} Coefficient of variation (CV) measures relative dispersion across scenarios.
+\begin{itemize}
+\item U5MR estimates: Average CV = 0.120
+\item IMR estimates: Average CV = 0.118
+\item CV $< 0.2$ indicates robust estimates
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Sensitivity Analysis: Method Comparison}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{Analytical vs Crossing:}
+\begin{itemize}
+\item U5MR: Crossing 4.3\% higher on average
+\item IMR: Crossing 3.7\% higher on average
+\end{itemize}
+
+
+\vspace{0.3cm}
+\textbf{Convergence diagnostics:}
+\begin{itemize}
+  \item Stan models: $\hat{R} < 1.01$
+  \item INLA models: Successful approximation
+  \item Effective sample sizes: $>1000$
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Implications for policy:}
+\begin{itemize}
+  \item Threshold estimates robust across methods
+  \item Location exclusions show limited impact
+  \item Both analytical approaches converge
+  \item Conservative: Use crossing method upper bounds
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Uncertainty sources:}
+\begin{itemize}
+  \item Sampling uncertainty (MCMC)
+  \item Model specification
+  \item Site heterogeneity  
+  \item Age pattern assumptions
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Sensitivity Analysis: Conclusions}
+\textbf{Summary of sensitivity analysis:}\begin{itemize}\item U5MR thresholds range: 33.6 - 61.1 per 1,000\item IMR thresholds range: 19.7 - 34.4 per 1,000\item Estimates show good consistency across scenarios\item Method differences are within uncertainty bounds\end{itemize}\vspace{0.3cm}\textbf{Most robust estimates:}\begin{enumerate}\item U5MR Crossing method (CV = 0.078)\item IMR Crossing method (CV = 0.083)\end{enumerate}
+
+\vspace{0.3cm}
+\textbf{Recommendations:}
+\begin{itemize}
+  \item Primary analysis provides robust point estimates
+  \item Use sensitivity bounds for conservative planning
+  \item Monitor resistance regardless of threshold approach
+\end{itemize}
+\end{frame}
+
+% -------------------------------
+\section{Discussion}
+
+\begin{frame}{Comparison with Current Guidance}
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+& \textbf{WHO 2020} & \textbf{This Study} \\
+\midrule
+IMR threshold & 60 per 1,000 & 26.6 per 1,000 (20.3-37.9) \\
+U5MR threshold & 80 per 1,000 & 47.8 per 1,000 (35.8-72.0) \\
+Basis & Expert opinion & Trial data analysis \\
+Uncertainty & Not quantified & Full posterior distributions \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\textbf{Implications:}
+\begin{itemize}
+  \item Programs might continue longer than current guidance suggests
+  \item Important caveat: Resistance monitoring remains essential
+  \item Balance mortality benefits with AMR concerns through surveillance
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Limitations \& Next Steps}
+\textbf{Key limitations}
+\begin{itemize}
+  \item \textbf{Context alignment:} Outcomes cannot be perfectly matched with contextual drivers (vaccination, malaria, health systems, nutrition) in space and time.
+  \item \textbf{External validity:} Analysis is based on a limited set of trial countries and sample sizes; findings may not generalize directly elsewhere.
+\end{itemize}
+
+\vspace{0.35em}
+\textbf{Contribution}
+\begin{itemize}
+  \item \textbf{First data-driven} threshold analysis for REACH, with transparent assumptions and full uncertainty quantification.
+  \item \textbf{Fully reproducible:} \url{https://github.com/IDM-Wmsemburi/reach-cessation-analysis}
+\end{itemize}
+
+\vspace{0.35em}
+\textbf{Next steps}
+\begin{itemize}
+  \item Refine estimates by testing sensitivity to key modeling assumptions (e.g., age-splits, spatial priors, functional form of interactions).
+\end{itemize}
+\end{frame}
+
+
+\end{document}

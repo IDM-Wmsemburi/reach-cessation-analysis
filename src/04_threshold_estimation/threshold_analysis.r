@@ -56,10 +56,10 @@ data_analysis <- data_crt_geospatial %>%
 df <- data_analysis %>%
   sum_deaths_and_person_time(c("country", "trial_phase", "community_id", "trt")) %>%
   dplyr::left_join(df.mod %>% 
-                   dplyr::select(country, community_id, 
-                                post_u5mr, post_u5mr_log, post_u5mr_log_sd,
-                                post_imr, post_imr_log, post_imr_log_sd) %>% 
-                   dplyr::distinct(),
+                     dplyr::select(country, community_id, 
+                                   post_u5mr, post_u5mr_log, post_u5mr_log_sd,
+                                   post_imr, post_imr_log, post_imr_log_sd) %>% 
+                     dplyr::distinct(),
                    by = dplyr::join_by(country, community_id)) %>%
   dplyr::filter(!is.na(post_u5mr_log), !is.na(post_u5mr_log_sd), 
                 !is.na(post_imr_log), !is.na(post_imr_log_sd),
@@ -70,7 +70,7 @@ group_index <- create_group_index(df)
 df <- df %>%
   dplyr::left_join(group_index, by = c("trial_phase", "country")) %>%
   dplyr::arrange(group_id, community_id) %>%
-  dplyr::filter(!is.na(group_id))
+  dplyr::filter(!is.na(group_id)) 
 
 cat("Data prepared: ", nrow(df), " clusters across ", 
     dplyr::n_distinct(df$group_id), " trial-countries\n")
@@ -111,7 +111,7 @@ cat("Mortality ranges - U5MR: [", round(u5_min*1000, 1), ", ", round(u5_max*1000
 # STAN MODEL FOR THRESHOLD ANALYSIS
 # ===============================================================================
 
-stancode_single_model <- "
+stancode_variable_model <- "
 functions {
   real crossing_from_preds(int Np, array[,] real pred, vector log_x) {
     real neg_inf = negative_infinity();
@@ -210,41 +210,113 @@ generated quantities {
 }
 "
 
-# ===============================================================================
-# INITIALIZATION FUNCTION
-# ===============================================================================
-
-compute_smart_inits_single <- function(data, mortality_col, n_chains = 4) {
-  # GLM fit for initialization
-  fml <- as.formula(paste("deaths ~ offset(log(person_time)) +", mortality_col, "+ trt + factor(group_id)"))
-  
-  tryCatch({
-    glm_fit <- glm(fml, data = data, family = poisson())
-    coefs <- coef(glm_fit)
-  }, error = function(e) {
-    warning("GLM initialization failed, using default values")
-    coefs <- c("(Intercept)" = 0, trt = 0)
-    names(coefs)[2] <- mortality_col
-  })
-  
-  purrr::map(1:n_chains, function(i) {
-    list(
-      log_mortality_raw = rnorm(nrow(data), 0, 0.1),
-      alpha_group_raw = rnorm(max(data$group_id), 0, 0.1),
-      sigma_group = abs(rnorm(1, 0.5, 0.1)),
-      mu_alpha_group = get_or0(coefs, "(Intercept)") + rnorm(1, 0, 0.1),
-      beta_mortality = get_or0(coefs, mortality_col) + rnorm(1, 0, 0.1),
-      beta_trt = get_or0(coefs, "trt") + rnorm(1, 0, 0.1),
-      beta_trt_mortality = rnorm(1, 0, 0.1)
-    )
-  })
+stancode_fixed_model <- "
+functions {
+  real crossing_from_preds(int Np, array[,] real pred, vector log_x) {
+    real neg_inf = negative_infinity();
+    for (u in 1:(Np-1)) {
+      real d0 = log(pred[u,2])   - log(pred[u,1]);
+      real d1 = log(pred[u+1,2]) - log(pred[u+1,1]);
+      if (abs(d0) < 1e-12) return exp(log_x[u]);
+      if ((d0 < 0 && d1 > 0) || (d0 > 0 && d1 < 0)) {
+        real t  = d0 / (d0 - d1);
+        real lx = log_x[u] + t * (log_x[u+1] - log_x[u]);
+        return exp(lx);
+      }
+    }
+    return neg_inf;
+  }
 }
+data {
+  int<lower=1> N, J, N_pred;
+  array[N] int<lower=0> deaths;
+  vector<lower=0>[N] person_time;
+  array[N] int<lower=0,upper=1> trt;
+  array[N] int<lower=1,upper=J> group;
+  vector[N] log_mortality_mean;
+  vector<lower=0>[N] log_mortality_sd;
+  vector[N_pred] log_mortality_pred;
+}
+parameters {
+  // Hierarchical group effects
+  vector[J] alpha_group_raw;
+  real mu_alpha_group;
+  real<lower=0> sigma_group;
+  
+  // Model coefficients
+  real beta_mortality;
+  real beta_trt;
+  real beta_trt_mortality;
+}
+transformed parameters {
+  vector[J] alpha_group = mu_alpha_group + sigma_group * alpha_group_raw;
+}
+model {
+  // Priors
+  alpha_group_raw ~ std_normal();
+  mu_alpha_group ~ normal(0, 1);
+  sigma_group ~ normal(0, 1);
+  
+  beta_mortality ~ normal(0, 1);
+  beta_trt ~ normal(0, 0.5);
+  beta_trt_mortality ~ normal(0, 0.5);
+  
+  // Likelihood
+  vector[N] mu;
+  for (i in 1:N) {
+    mu[i] = alpha_group[group[i]] + 
+            beta_mortality * log_mortality_mean[i] +
+            trt[i] * (beta_trt + beta_trt_mortality * log_mortality_mean[i]) +
+            log(person_time[i]);
+  }
+  deaths ~ poisson_log(mu);
+}
+generated quantities {
+  // Predictions
+  array[N_pred, 2] real pred_lambda;
+  
+  // Crossing-based threshold
+  real threshold;
+  int has_cross;
+  
+  real mean_alpha = mean(alpha_group);
+  
+  // Generate predictions
+  for (u in 1:N_pred) {
+    real mu_base = mean_alpha +
+                   beta_mortality * log_mortality_pred[u] +
+                   log(365.25);
+    real mu_trt = mu_base +
+                  beta_trt +
+                  beta_trt_mortality * log_mortality_pred[u];
+    
+    pred_lambda[u, 1] = exp(mu_base);  // placebo
+    pred_lambda[u, 2] = exp(mu_trt);   // treatment
+  }
+  
+  // Calculate crossing threshold
+  threshold = crossing_from_preds(N_pred, pred_lambda, log_mortality_pred);
+  has_cross = (threshold != negative_infinity());
+}
+"
 
 # ===============================================================================
 # MODEL FITTING
 # ===============================================================================
 
-cat("Compiling Stan model...\n")
+stan_data_u5mr <- make_stan_data(
+  df, "post_u5mr_log", "post_u5mr_log_sd",
+  u5_min, u5_max, n_pred = 100L
+)
+
+stan_data_imr <- make_stan_data(
+  df, "post_imr_log", "post_imr_log_sd",
+  im_min, im_max, n_pred = 100L
+)
+
+# Fit U5MR model
+init_values_u5mr <- compute_smart_inits_single(df, "post_u5mr_log", n_chains = 4)
+init_values_imr <- compute_smart_inits_single(df, "post_imr_log", n_chains = 4)
 
 # Create model directory if it doesn't exist
 model_dir <- "../../models/stan"
@@ -252,18 +324,14 @@ if (!dir.exists(model_dir)) {
   dir.create(model_dir, recursive = TRUE)
 }
 
+cat("Compiling Variable Stan model...\n")
+
 # Write and compile Stan model
-stan_file <- cmdstanr::write_stan_file(stancode_single_model, dir = model_dir, basename = "reach_mortality_model")
+stan_file <- cmdstanr::write_stan_file(stancode_variable_model, dir = model_dir, 
+                                       basename = "reach_mortality_model")
 mod <- cmdstanr::cmdstan_model(stan_file, cpp_options = list(stan_threads = TRUE))
 
-# Prepare Stan data for both models
-stan_data_u5mr <- make_stan_data(df, "post_u5mr_log", "post_u5mr_log_sd", u5_min, u5_max, 51L)
-stan_data_imr <- make_stan_data(df, "post_imr_log", "post_imr_log_sd", im_min, im_max, 51L)
-
-cat("Fitting U5MR threshold model...\n")
-
-# Fit U5MR model
-init_values_u5mr <- compute_smart_inits_single(df, "post_u5mr_log", n_chains = 4)
+cat("Fitting U5MR threshold model (variable mortality)...\n")
 
 fit_u5mr <- mod$sample(
   data = stan_data_u5mr,
@@ -271,17 +339,16 @@ fit_u5mr <- mod$sample(
   chains = 4,
   parallel_chains = 4,
   threads_per_chain = 1,
-  iter_warmup = 1000,
-  iter_sampling = 1500,
-  adapt_delta = 0.96,
-  max_treedepth = 12,
-  refresh = 500
+  iter_warmup = 2000,
+  iter_sampling = 2000,
+  adapt_delta = 0.99,
+  max_treedepth = 15,
+  refresh = 1000
 )
 
-cat("Fitting IMR threshold model...\n")
+cat("Fitting IMR threshold model (variable mortality)...\n")
 
 # Fit IMR model
-init_values_imr <- compute_smart_inits_single(df, "post_imr_log", n_chains = 4)
 
 fit_imr <- mod$sample(
   data = stan_data_imr,
@@ -289,14 +356,58 @@ fit_imr <- mod$sample(
   chains = 4,
   parallel_chains = 4,
   threads_per_chain = 1,
-  iter_warmup = 1000,
-  iter_sampling = 1500,
-  adapt_delta = 0.96,
-  max_treedepth = 12,
-  refresh = 500
+  iter_warmup = 2000,
+  iter_sampling = 2000,
+  adapt_delta = 0.99,
+  max_treedepth = 15,
+  refresh = 1000
 )
 
 cat("Model fitting completed\n")
+
+cat("Compiling Fixed Stan models...\n")
+
+stan_file_fixed <- cmdstanr::write_stan_file(stancode_fixed_model, dir = model_dir, 
+                                             basename = "reach_mortality_model_fixed")
+mod_fixed <- cmdstanr::cmdstan_model(stan_file_fixed, cpp_options = list(stan_threads = TRUE))
+
+cat("Fitting U5MR threshold model (fixed mortality)...\n")
+
+fit_u5mr_fixed <- mod_fixed$sample(
+  data = stan_data_u5mr,
+  init = init_values_u5mr,
+  chains = 4,
+  parallel_chains = 4,
+  threads_per_chain = 1,
+  iter_warmup = 2000,
+  iter_sampling = 2000,
+  adapt_delta = 0.99,
+  max_treedepth = 15,
+  refresh = 1000
+)
+
+cat("Fitting IMR threshold model (fixed mortality)...\n")
+
+fit_imr_fixed <- mod_fixed$sample(
+  data = stan_data_imr,
+  init = init_values_imr,
+  chains = 4,
+  parallel_chains = 4,
+  threads_per_chain = 1,
+  iter_warmup = 2000,
+  iter_sampling = 2000,
+  adapt_delta = 0.99,
+  max_treedepth = 15,
+  refresh = 1000
+)
+
+cat("Model fitting completed\n")
+
+# force-read so the objects don’t depend on CSVs later
+invisible(fit_u5mr$draws()); 
+invisible(fit_imr$draws());
+invisible(fit_u5mr_fixed$draws());
+invisible(fit_imr_fixed$draws());
 
 # ===============================================================================
 # THRESHOLD EXTRACTION
@@ -317,24 +428,30 @@ extract_finite_thresholds <- function(fit) {
 thresholds_u5mr <- extract_finite_thresholds(fit_u5mr)
 thresholds_imr <- extract_finite_thresholds(fit_imr)
 
+thresholds_u5mr_fixed <- extract_finite_thresholds(fit_u5mr_fixed)
+thresholds_imr_fixed <- extract_finite_thresholds(fit_imr_fixed)
+
 # Summary function for quantiles
 qs95 <- function(df){
   df %>%
-  summarise(
-    n = n(),
-    threshold_mean_1000 = 1e3*mean(threshold, na.rm = TRUE),
-    threshold_med_1000 = 1e3*median(threshold, na.rm = TRUE),
-    sd = sd(threshold, na.rm = TRUE),
-    threshold_lo_1000 = 1e3*quantile(threshold, 0.025, na.rm = TRUE),
-    threshold_hi_1000 = 1e3*quantile(threshold, 0.975, na.rm = TRUE)
-  )
+    summarise(
+      n = n(),
+      threshold_mean_1000 = 1e3*mean(threshold, na.rm = TRUE),
+      threshold_med_1000 = 1e3*median(threshold, na.rm = TRUE),
+      sd = sd(threshold, na.rm = TRUE),
+      threshold_lo_1000 = 1e3*quantile(threshold, 0.025, na.rm = TRUE),
+      threshold_hi_1000 = 1e3*quantile(threshold, 0.975, na.rm = TRUE)
+    )
 }
 
 # Create threshold results summary
 threshold_results <- rbind(data.frame(qs95(thresholds_u5mr)),
-        data.frame(qs95(thresholds_imr))) |>
+                           data.frame(qs95(thresholds_imr))) |>
   mutate(model = c("U5MR", "IMR"))
-  
+
+threshold_results_fixed <- rbind(data.frame(qs95(thresholds_u5mr_fixed)),
+                                 data.frame(qs95(thresholds_imr_fixed))) |>
+  mutate(model = c("U5MR", "IMR"))  
 # ===============================================================================
 # COEFFICIENT EXTRACTION
 # ===============================================================================
@@ -627,7 +744,9 @@ results_dir <- "../../results"
 figs_dir <- "../../results/figs"
 
 # Save model fits and data
-save(fit_u5mr, fit_imr, stan_data_u5mr, stan_data_imr, df, df_plot, group_index,
+save(fit_u5mr, fit_imr, 
+     fit_u5mr_fixed, fit_imr_fixed,  
+     stan_data_u5mr, stan_data_imr, df, df_plot, group_index,
      file = file.path(results_dir, "threshold_models.rda"))
 
 # Save threshold results
@@ -701,3 +820,82 @@ time_elapsed <- round(as.numeric(end_time - start_time, units = 'mins'), 1)
 cat("\nThreshold analysis completed in", time_elapsed, "minutes\n")
 
 message("Threshold analysis completed successfully!")
+
+reg_dens <- function(){
+  require(dplyr)
+  require(tidyr)
+  require(bayesplot)
+  require(patchwork)
+  
+  df <- bind_rows(
+    posterior::as_draws_df(fit_u5mr$draws("threshold")) |>
+      transmute(value = 1000 * threshold, model = "U5MR"),
+    posterior::as_draws_df(fit_imr$draws("threshold")) |>
+      transmute(value = 1000 * threshold, model = "IMR")
+  ) |>
+    filter(is.finite(value))
+  
+  wide <- df %>%
+    group_by(model) %>% mutate(.row = row_number()) %>% ungroup() %>%
+    pivot_wider(id_cols = .row, names_from = model, values_from = value) %>%
+    select(-.row) %>%
+    drop_na()                                # ensure rectangular
+  
+  mat <- as.matrix(wide)                      # iterations × parameters
+  colnames(mat) <- colnames(wide)             # e.g., "IMR", "U5MR"
+  
+  thresh <- bayesplot::mcmc_areas(mat, prob = 0.95) +
+    labs(x = "Threshold (per 1,000 live births)", y = NULL, title = "Crossing thresholds")
+  
+  df <- bind_rows(
+    posterior::as_draws_df(fit_u5mr$draws("beta_trt")) |>
+      transmute(value = beta_trt, model = "U5MR", coeff = "Treatment"),
+    posterior::as_draws_df(fit_imr$draws("beta_trt")) |>
+      transmute(value = beta_trt, model = "IMR", coeff = "Treatment"),
+    posterior::as_draws_df(fit_u5mr$draws("beta_trt_mortality")) |>
+      transmute(value = beta_trt_mortality, model = "U5MR", coeff = "Treatment x Mortality"), 
+    posterior::as_draws_df(fit_imr$draws("beta_trt_mortality")) |>
+      transmute(value = beta_trt_mortality, model = "IMR", coeff = "Treatment x Mortality")
+  ) |> filter(is.finite(value)) |>
+    mutate(model = paste(model, coeff), coeff = NULL)
+  
+  wide <- df %>%
+    group_by(model) %>% mutate(.row = row_number()) %>% ungroup() %>%
+    pivot_wider(id_cols = .row, names_from = model, values_from = value) %>%
+    select(-.row) %>%
+    drop_na()  
+  
+  mat <- as.matrix(wide)                      # iterations × parameters
+  colnames(mat) <- colnames(wide)             # e.g., "IMR", "U5MR"
+  
+  regs <- bayesplot::mcmc_areas(mat, prob = 0.95) +
+    labs(x = "Effects", y = NULL, title = "Regression coefficients")
+  
+  out <- patchwork::wrap_plots(regs, thresh)
+}
+
+figs_dir <- "../../results/figs"
+pdf(file.path(figs_dir, "regression_densities.pdf"), 
+    width = 7, height = 5)
+print(reg_dens())
+dev.off()
+
+#=======================================================================================
+# Some diagnostics
+#=======================================================================================
+
+few.diagnostics <- function(fit){
+  # Check standard Stan diagnostics
+  mod_diagnostics <- fit$diagnostic_summary()
+  cat("Divergent transitions:", mod_diagnostics$num_divergent, "\n")
+  cat("Max treedepth hits:", mod_diagnostics$num_max_treedepth, "\n")
+  
+  # Detailed convergence diagnostics
+  mod_summary <- fit$summary(variables = c("threshold", "beta_trt", "beta_trt_mortality"))
+  print(mod_summary[c("variable", "rhat", "ess_bulk", "ess_tail")])
+}
+
+few.diagnostics(fit_u5mr)
+few.diagnostics(fit_imr)
+few.diagnostics(fit_u5mr_fixed)
+few.diagnostics(fit_imr_fixed)

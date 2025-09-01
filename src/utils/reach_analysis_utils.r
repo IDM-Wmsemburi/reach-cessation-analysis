@@ -81,16 +81,39 @@ pick_utm_epsg <- function(lon, lat) {
 # STAN MODEL UTILITIES (used in threshold analysis)
 # ===============================================================================
 
-#' Safe coefficient extraction for model initialization
-#' Used in: threshold_analysis.R (for Stan initialization)
-#' @param coef_vec Named coefficient vector
-#' @param coef_name Coefficient name to extract
-#' @return Coefficient value or 0 if not found
+# Safe coefficient extraction for model initialization
 get_or0 <- function(coef_vec, coef_name) {
   if (coef_name %in% names(coef_vec)) coef_vec[[coef_name]] else 0
 }
 
-#' Generic Stan data construction for mortality models
+compute_smart_inits_single <- function(data, mortality_col, n_chains = 4) {
+  # GLM fit for initialization
+  fml <- as.formula(paste("deaths ~ offset(log(person_time)) +", mortality_col, "+ trt + factor(group_id)"))
+  
+  tryCatch({
+    glm_fit <- glm(fml, data = data, family = poisson())
+    coefs <- coef(glm_fit)
+  }, error = function(e) {
+    warning("GLM initialization failed, using default values")
+    coefs <- c("(Intercept)" = 0, trt = 0)
+    names(coefs)[2] <- mortality_col
+  })
+  
+  purrr::map(1:n_chains, function(i) {
+    list(
+      log_mortality_raw = rnorm(nrow(data), 0, 0.1),
+      alpha_group_raw = rnorm(max(data$group_id), 0, 0.1),
+      sigma_group = abs(rnorm(1, 0.5, 0.1)),
+      mu_alpha_group = get_or0(coefs, "(Intercept)") + rnorm(1, 0, 0.1),
+      beta_mortality = get_or0(coefs, mortality_col) + rnorm(1, 0, 0.1),
+      beta_trt = get_or0(coefs, "trt") + rnorm(1, 0, 0.1),
+      beta_trt_mortality = rnorm(1, 0, 0.1)
+    )
+  })
+}
+
+
+#' Generic Stan data construction for mortality models (with MC integration)
 #' Used in: threshold_analysis.R
 #' @param df Input dataset
 #' @param log_mean_col Column name for log mortality mean
@@ -98,7 +121,6 @@ get_or0 <- function(coef_vec, coef_name) {
 #' @param xmin Minimum value for prediction grid
 #' @param xmax Maximum value for prediction grid
 #' @param n_pred Number of prediction points (default: 41)
-#' @return List formatted for Stan
 make_stan_data <- function(df, log_mean_col, log_sd_col, xmin, xmax, n_pred = 41L) {
   list(
     N = nrow(df),
