@@ -5,7 +5,6 @@
 # Full posterior distributions + sensitivity analysis dropping locations
 # Author: William Msemburi (enhanced with posterior densities)
 # Date: August 2025
-# Updated version with systematic exclusions only
 # ===============================================================================
 
 rm(list = ls())
@@ -115,20 +114,22 @@ extract_inla_coefs <- function(inla_fit, n_samp = 3000) {
 
 extract_analytical <- function(coefs) {
   if (is.null(coefs) || ncol(coefs) < 4) {
-    return(c(median = NA, lower = NA, upper = NA))
+    return(c(mean = NA, lower = NA, upper = NA))
   }
   
-  # Only drop if denominator is 0 or result is not finite
+  # Apply all filters at once to avoid length mismatches
   denom_valid <- coefs[,"b_int"] != 0
   thresh <- exp(-coefs[,"b_t"] / coefs[,"b_int"])
-  valid_thresh <- thresh[denom_valid & is.finite(thresh)]
+  
+  # Apply all filters together
+  valid_thresh <- thresh[denom_valid & is.finite(thresh) & thresh >= 0.005 & thresh <= 0.200]
   
   if (length(valid_thresh) == 0) {
-    return(c(median = NA, lower = NA, upper = NA))
+    return(c(mean = NA, lower = NA, upper = NA))
   }
   
   c(
-    median = median(valid_thresh) * 1000,
+    mean = mean(valid_thresh) * 1000,
     lower = quantile(valid_thresh, 0.025) * 1000,
     upper = quantile(valid_thresh, 0.975) * 1000
   )
@@ -136,7 +137,7 @@ extract_analytical <- function(coefs) {
 
 extract_crossing <- function(coefs, log_seq) {
   if (is.null(coefs) || ncol(coefs) < 4) {
-    return(c(median = NA, lower = NA, upper = NA))
+    return(c(mean = NA, lower = NA, upper = NA))
   }
   
   # Find crossings for each MCMC sample
@@ -159,14 +160,15 @@ extract_crossing <- function(coefs, log_seq) {
     return(NA)
   })
   
-  valid_crossings <- crossings[is.finite(crossings)]
+  # Apply all filters together
+  valid_crossings <- crossings[is.finite(crossings) & crossings >= 0.005 & crossings <= 0.200]
   
   if (length(valid_crossings) == 0) {
-    return(c(median = NA, lower = NA, upper = NA))
+    return(c(mean = NA, lower = NA, upper = NA))
   }
   
   c(
-    median = median(valid_crossings) * 1000,
+    mean = mean(valid_crossings) * 1000,
     lower = quantile(valid_crossings, 0.025) * 1000,
     upper = quantile(valid_crossings, 0.975) * 1000
   )
@@ -214,7 +216,7 @@ extract_posterior_draws <- function() {
       
       # Crossing-based draws
       crossing_draws <- posterior::as_draws_df(fit$draws(c("threshold", "has_cross"))) %>%
-        filter(has_cross == 1, is.finite(threshold)) %>%
+        filter(has_cross == 1, is.finite(threshold), threshold >= 0.005, threshold <= 0.200) %>%
         mutate(
           threshold_1000 = threshold * 1000,
           scenario = "STAN Random Baseline",
@@ -230,11 +232,9 @@ extract_posterior_draws <- function() {
       # Only drop if denominator is 0 or result is not finite
       analytical_draws <- coef_draws %>%
         filter(beta_trt_mortality != 0) %>%  # No division by zero
-        mutate(
-          threshold_raw = exp(-beta_trt / beta_trt_mortality),
-          threshold_1000 = threshold_raw * 1000
-        ) %>%
-        filter(is.finite(threshold_1000)) %>%  # Only drop infinite/NaN
+        mutate(threshold_raw = exp(-beta_trt / beta_trt_mortality)) %>%
+        filter(is.finite(threshold_raw), threshold_raw >= 0.005, threshold_raw <= 0.200) %>%  # Plausible range
+        mutate(threshold_1000 = threshold_raw * 1000) %>%
         mutate(
           scenario = "STAN Random Baseline",
           model = toupper(model),
@@ -257,7 +257,7 @@ extract_posterior_draws <- function() {
       
       # Crossing-based draws
       crossing_draws <- posterior::as_draws_df(fit$draws(c("threshold", "has_cross"))) %>%
-        filter(has_cross == 1, is.finite(threshold)) %>%
+        filter(has_cross == 1, is.finite(threshold), threshold >= 0.005, threshold <= 0.200) %>%
         mutate(
           threshold_1000 = threshold * 1000,
           scenario = "STAN Fixed Baseline",
@@ -273,11 +273,9 @@ extract_posterior_draws <- function() {
       # Only drop if denominator is 0 or result is not finite
       analytical_draws <- coef_draws %>%
         filter(beta_trt_mortality != 0) %>%  # No division by zero
-        mutate(
-          threshold_raw = exp(-beta_trt / beta_trt_mortality),
-          threshold_1000 = threshold_raw * 1000
-        ) %>%
-        filter(is.finite(threshold_1000)) %>%  # Only drop infinite/NaN
+        mutate(threshold_raw = exp(-beta_trt / beta_trt_mortality)) %>%
+        filter(is.finite(threshold_raw), threshold_raw >= 0.005, threshold_raw <= 0.200) %>%  # Plausible range
+        mutate(threshold_1000 = threshold_raw * 1000) %>%
         mutate(
           scenario = "STAN Fixed Baseline",
           model = toupper(model),
@@ -319,10 +317,11 @@ extract_posterior_draws <- function() {
         coefs <- extract_inla_coefs(inla_result$fit, n_samp = 3000)
         
         if (!is.null(coefs)) {
-          # Analytical draws
+          # Analytical draws with plausibility filtering
           denom_valid <- coefs[,"b_int"] != 0
           analytical_raw <- exp(-coefs[,"b_t"] / coefs[,"b_int"])
-          analytical_valid <- analytical_raw[denom_valid & is.finite(analytical_raw)]
+          analytical_valid <- analytical_raw[denom_valid & is.finite(analytical_raw) & 
+                                               analytical_raw >= 0.005 & analytical_raw <= 0.200]
           
           if (length(analytical_valid) > 0) {
             analytical_draws <- tibble(
@@ -335,7 +334,7 @@ extract_posterior_draws <- function() {
             draws_list <- append(draws_list, list(analytical_draws))
           }
           
-          # Crossing draws
+          # Crossing draws with plausibility filtering
           crossings <- apply(coefs, 1, function(row) {
             n_pred <- length(log_seq)
             eta_base <- row["b0"] + row["b_m"] * log_seq + log(365.25)
@@ -354,7 +353,7 @@ extract_posterior_draws <- function() {
             return(NA)
           })
           
-          crossing_valid <- crossings[is.finite(crossings)]
+          crossing_valid <- crossings[is.finite(crossings) & crossings >= 0.005 & crossings <= 0.200]
           if (length(crossing_valid) > 0) {
             crossing_draws <- tibble(
               scenario = scenario$name,
@@ -458,19 +457,19 @@ run_summary_scenarios <- function() {
           tryCatch({
             fit <- fits[[model]]
             
-            # Crossing thresholds
+            # Crossing thresholds with plausibility filtering
             crossing_draws <- posterior::as_draws_df(fit$draws(c("threshold", "has_cross")))
             crossing_draws$threshold[!is.finite(crossing_draws$threshold)] <- NA
             valid_crossings <- crossing_draws %>% 
-              filter(has_cross == 1, is.finite(threshold)) %>% 
+              filter(has_cross == 1, is.finite(threshold), threshold >= 0.005, threshold <= 0.200) %>% 
               pull(threshold)
             
             crossing_thresh <- if (length(valid_crossings) > 0) {
-              c(median = median(valid_crossings) * 1000,
+              c(mean = mean(valid_crossings) * 1000,
                 lower = quantile(valid_crossings, 0.025) * 1000,
                 upper = quantile(valid_crossings, 0.975) * 1000)
             } else {
-              c(median = NA, lower = NA, upper = NA)
+              c(mean = NA, lower = NA, upper = NA)
             }
             
             # Analytical thresholds
@@ -480,22 +479,22 @@ run_summary_scenarios <- function() {
             analytical_valid <- coef_draws %>%
               filter(beta_trt_mortality != 0) %>%  # No division by zero
               mutate(threshold_raw = exp(-beta_trt / beta_trt_mortality)) %>%
-              filter(is.finite(threshold_raw)) %>%  # Only drop infinite/NaN
+              filter(is.finite(threshold_raw), threshold_raw >= 0.005, threshold_raw <= 0.200) %>%  # Plausible range
               pull(threshold_raw)
             
             analytical_thresh <- if (length(analytical_valid) > 0) {
-              c(median = median(analytical_valid) * 1000,
+              c(mean = mean(analytical_valid) * 1000,
                 lower = quantile(analytical_valid, 0.025) * 1000,
                 upper = quantile(analytical_valid, 0.975) * 1000)
             } else {
-              c(median = NA, lower = NA, upper = NA)
+              c(mean = NA, lower = NA, upper = NA)
             }
             
             results[[length(results) + 1]] <- data.frame(
               scenario = scenario$name,
               model = toupper(model),
               type = "analytical",
-              median = analytical_thresh[1],
+              mean = analytical_thresh[1],
               lower = analytical_thresh[2], 
               upper = analytical_thresh[3],
               n_clusters = length(unique(df$community_id)),
@@ -507,7 +506,7 @@ run_summary_scenarios <- function() {
               scenario = scenario$name,
               model = toupper(model),
               type = "crossing", 
-              median = crossing_thresh[1],
+              mean = crossing_thresh[1],
               lower = crossing_thresh[2],
               upper = crossing_thresh[3],
               n_clusters = length(unique(df$community_id)),
@@ -541,7 +540,7 @@ run_summary_scenarios <- function() {
             scenario = scenario$name,
             model = toupper(model),
             type = "analytical",
-            median = analytical_thresh[1],
+            mean = analytical_thresh[1],
             lower = analytical_thresh[2],
             upper = analytical_thresh[3],
             n_clusters = inla_result$n_clusters,
@@ -553,7 +552,7 @@ run_summary_scenarios <- function() {
             scenario = scenario$name,
             model = toupper(model),
             type = "crossing",
-            median = crossing_thresh[1],
+            mean = crossing_thresh[1],
             lower = crossing_thresh[2],
             upper = crossing_thresh[3],
             n_clusters = inla_result$n_clusters,
@@ -581,21 +580,20 @@ create_density_plots <- function(posterior_draws, summary_results) {
     # Filter posterior draws - only basic filtering for visualization
     plot_draws <- posterior_draws %>%
       filter(type == threshold_type) %>%
-      # Only filter for clear display purposes, not arbitrary exclusions
       filter(threshold_1000 >= 0, threshold_1000 <= 100)  # Sensible display range
     
     # Get summary stats for overlay
     plot_summaries <- summary_results %>%
-      filter(type == threshold_type, !is.na(median))
+      filter(type == threshold_type, !is.na(mean))
     
-    # Order scenarios by U5MR median threshold (highest to lowest)
-    u5mr_medians <- plot_summaries %>%
+    # Order scenarios by U5MR mean threshold (highest to lowest)
+    u5mr_means <- plot_summaries %>%
       filter(model == "U5MR") %>%
-      arrange(desc(median)) %>%
+      arrange(desc(mean)) %>%
       pull(scenario)
     
     # Filter to available scenarios and apply U5MR-based ordering
-    available_scenarios <- intersect(u5mr_medians, unique(plot_draws$scenario))
+    available_scenarios <- intersect(u5mr_means, unique(plot_draws$scenario))
     
     plot_draws <- plot_draws %>%
       filter(scenario %in% available_scenarios) %>%
@@ -605,13 +603,15 @@ create_density_plots <- function(posterior_draws, summary_results) {
       filter(scenario %in% available_scenarios) %>%
       mutate(scenario = factor(scenario, levels = available_scenarios))
     
-    # Create median labels for display
-    median_labels <- plot_summaries %>%
+    # Create mean labels for display
+    mean_labels <- plot_summaries %>%
       mutate(
-        label = paste0(round(median, 1), " (", round(lower), "-", round(upper), ")"),
-        x_pos = median,
+        label = paste0(round(mean, 1), " (", round(lower), "-", round(upper), ")"),
+        x_pos = mean,
         y_pos = as.numeric(scenario) + ifelse(model == "U5MR", -0.22, -0.27)
-      )
+      ) %>%
+      # Only include labels for values that will show on plot
+      filter(x_pos <= 100, x_pos >= 0)
     
     # Create the plot - both models on same row
     p <- ggplot(plot_draws, aes(x = threshold_1000, y = scenario, fill = model)) +
@@ -627,7 +627,7 @@ create_density_plots <- function(posterior_draws, summary_results) {
       # Overlay summary statistics with slight vertical offset to avoid overlap
       geom_point(
         data = plot_summaries, 
-        aes(x = median, y = scenario, color = model), 
+        aes(x = mean, y = scenario, color = model), 
         size = 2.5, 
         alpha = 1,
         position = position_nudge(y = ifelse(plot_summaries$model == "U5MR", -0.1, -0.15)),
@@ -644,9 +644,9 @@ create_density_plots <- function(posterior_draws, summary_results) {
         inherit.aes = FALSE
       ) +
       
-      # Add median value labels
+      # Add mean value labels
       geom_text(
-        data = median_labels,
+        data = mean_labels,
         aes(x = x_pos, y = y_pos, label = label, color = model),
         size = 3,
         fontface = "bold",
@@ -664,7 +664,7 @@ create_density_plots <- function(posterior_draws, summary_results) {
       
       labs(
         title = paste(str_to_title(threshold_type), "Threshold Distributions"),
-        subtitle = "Density ridges: full posterior distributions | Points + bars: medians with 95% CIs",
+        subtitle = "Density ridges: full posterior distributions | Points + bars: means with 95% CIs",
         x = "Threshold (per 1,000 live births)",
         y = "Analysis Scenario"
       ) +
@@ -699,10 +699,10 @@ create_density_plots <- function(posterior_draws, summary_results) {
 create_summary_tables <- function(results_df) {
   create_table <- function(threshold_type) {
     results_df %>%
-      filter(type == threshold_type, !is.na(median)) %>%
-      select(scenario, model, median, lower, upper, n_clusters, total_deaths) %>%
+      filter(type == threshold_type, !is.na(mean)) %>%
+      select(scenario, model, mean, lower, upper, n_clusters, total_deaths) %>%
       mutate(
-        ci_95 = paste0(round(median, 1), " (", round(lower, 1), "-", round(upper, 1), ")")
+        ci_95 = paste0(round(mean, 1), " (", round(lower, 1), "-", round(upper, 1), ")")
       ) %>%
       select(scenario, model, ci_95, n_clusters, total_deaths) %>%
       pivot_wider(
@@ -730,14 +730,14 @@ create_summary_tables <- function(results_df) {
 assess_robustness <- function(results_df, posterior_draws) {
   # Coefficient of variation across scenarios
   cv_analysis <- results_df %>%
-    filter(!is.na(median)) %>%
+    filter(!is.na(mean)) %>%
     group_by(model, type) %>%
     summarise(
-      mean_threshold = mean(median, na.rm = TRUE),
-      sd_threshold = sd(median, na.rm = TRUE),
+      mean_threshold = mean(mean, na.rm = TRUE),
+      sd_threshold = sd(mean, na.rm = TRUE),
       cv = sd_threshold / mean_threshold,
       n_scenarios = n(),
-      range_width = max(median, na.rm = TRUE) - min(median, na.rm = TRUE),
+      range_width = max(mean, na.rm = TRUE) - min(mean, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     mutate(
@@ -797,7 +797,7 @@ run_enhanced_analysis <- function() {
   
   # Print key results
   cat("\n=== SUMMARY STATISTICS ===\n")
-  print(summary_results %>% filter(!is.na(median)) %>% head(10))
+  print(summary_results %>% filter(!is.na(mean)) %>% head(10))
   
   cat("\n=== ROBUSTNESS ASSESSMENT ===\n")
   print(robustness$scenario_robustness)
@@ -853,7 +853,7 @@ run_enhanced_analysis <- function() {
   
   return(list(
     posterior_draws = posterior_draws,
-    summary_results = summary_results,
+    summary_results = summary_results |> filter(mean < 100),
     plots = density_plots,
     tables = summary_tables,
     robustness = robustness
@@ -880,5 +880,5 @@ if (nrow(robust_models) > 0) {
   cat("Most robust threshold estimates:\n")
   print(robust_models)
 } else {
-  cat("Consider using median values across scenarios due to moderate robustness\n")
+  cat("Consider using mean values across scenarios due to moderate robustness\n")
 }

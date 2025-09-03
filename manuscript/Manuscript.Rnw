@@ -2,7 +2,8 @@
 \usepackage[a4paper,margin=1in]{geometry}
 \usepackage[automark]{scrlayer-scrpage}
 \usepackage{float}
-\linespread{1.5}
+\usepackage{setspace}
+\setstretch{1.5}
 
 \usepackage{longtable}
 \usepackage{amssymb, amsmath, graphicx, enumitem, kpfonts, titlesec, caption, hyperref, multirow, array, xcolor, booktabs, bm}
@@ -65,8 +66,8 @@ Cessation Thresholds for MDA Azithromycin \\
 
 <<setup, include=FALSE>>=
 knitr::opts_chunk$set(
-  echo = FALSE, 
-  message = FALSE, 
+  echo = FALSE,
+  message = FALSE,
   warning = FALSE,
   fig.height = 6,
   fig.width = 8,
@@ -76,6 +77,7 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(knitr)
 library(xtable)
+library(kableExtra)
 
 # Load results
 threshold_results <- NULL
@@ -94,36 +96,37 @@ if(file.exists("../results/threshold_coefficients.csv")) {
 
 \section{Introduction}
 
-Child mortality remains stubbornly high in sub-Saharan Africa---about 78 deaths per 1,000 live births in 2018 \citep{unicef2019}. This has driven the search for simple, scalable interventions that can reduce deaths where health systems are weak.
+Child mortality remains stubbornly high in sub-Saharan Africa---about 69 deaths per 1,000 live births in 2023 \citep{UNIGME2024} - fourteen times higher than the estimate for Europe and North America and about double the global average. This has driven the search for simple, scalable interventions that can reduce deaths where health systems are weak.
 
-Mass drug administration (MDA) of azithromycin has emerged as a promising approach. Originally used for trachoma elimination, azithromycin MDA showed unexpected benefits in reducing all-cause child mortality \citep{keenan2018nejm}. The landmark MORDOR trial found a 13.5\% reduction in under-five mortality with biannual treatment across Niger, Malawi, and Tanzania. Benefits persisted up to two years after the final treatment round \citep{keenan2019nejm}.
+Mass drug administration (MDA) of azithromycin has emerged as a promising approach. Originally used for trachoma elimination, azithromycin MDA showed unexpected benefits in reducing all-cause child mortality \citep{keenan2018nejm}. The landmark MORDOR trial found a 13.5\% reduction in under-five mortality with biannual treatment across Niger, Malawi, and Tanzania - the first randomized evidence that antibiotics could reduce all-cause child mortality outside of pneumonia treatment. Benefits persisted up to two years after the final treatment round \citep{keenan2019nejm}.
 
 But the benefits were not consistent across all trials. Impacts were strongest in high-mortality settings, raising questions about effectiveness in lower-risk populations \citep{oron2020ajtmh}. Meanwhile, concerns about antimicrobial resistance have grown, with evidence of increased macrolide resistance following repeated azithromycin exposure \citep{kalizang2025long}.
 
-The WHO tried to balance these concerns in 2020, recommending targeted use only where infant mortality exceeds 60 per 1,000 or under-five mortality exceeds 80 per 1,000 live births \citep{who2020guidelines}. However, these thresholds weren't derived from trial data---they reflected expert judgment attempting to weigh benefits against resistance risks.
+The WHO tried to balance these concerns in 2020, recommending targeted use only where infant mortality exceeds 60 per 1,000 or under-five mortality exceeds 80 per 1,000 live births \citep{who2020guidelines}. However, these thresholds weren't derived from trial data—they reflected expert judgment attempting to weigh benefits against resistance risks. While expert-based thresholds have precedent in global health programs, empirical approaches using trial data to define cessation criteria have proven more robust and implementable for mass drug administration programs \citep{jimenez2015mass, mahmud2021stopping, sharma2023evaluating}.
 
-This creates two critical gaps. First, trials report hazard ratios, but programs need mortality rates that policymakers understand. Translating trial hazards into demographic indicators like infant mortality rate (IMR) and under-five mortality rate (U5MR) is essential for informed decisions. Second, while baseline mortality clearly predicts benefit, we don't know whether other factors---vaccination coverage, malaria burden, healthcare access---systematically modify treatment effects.
+The aim of our research is simple yet significant: to provide the first data-driven basis for defining cessation criteria in azithromycin mass drug administration (MDA) programs.
 
-Building on established approaches for spatial mortality estimation \citep{besag1991bym, wakefield2020insr}, we address these gaps through a comprehensive secondary analysis of cluster-randomized trial data. We implement a four-stage Bayesian approach that establishes age-specific mortality patterns, derives trial-specific mortality estimates, produces community-level baseline mortality estimates, and develops threshold models identifying mortality levels where treatment benefits vanish.
+Building on established approaches for spatial mortality estimation \citep{besag1991bym, mercer2015aoas, wakefield2020insr}, we conduct a comprehensive secondary analysis of cluster-randomized trial data. Our four-stage Bayesian framework (i) establishes age-specific mortality patterns anchored to demographic survey data, (ii) derives trial-specific mortality estimates, (iii) produces spatially coherent community-level baseline mortality surfaces, and (iv) develops threshold models to identify the mortality levels at which treatment benefits are no longer observed.
 
-Our goal is straightforward: provide the first data-driven foundation for cessation criteria in azithromycin MDA programs.
+Recognizing that mortality alone may not capture all sources of variation, we also extend the analysis to assess whether other contextual factors—such as vaccination coverage, malaria burden, and healthcare access—modify treatment effects. This allows us to situate mortality-based thresholds within the broader landscape of contextual heterogeneity.
+
 
 \section*{Key messages}
 
 <<key-msg, echo=FALSE, results='hide'>>=
 thr <- readr::read_csv("../results/threshold_results.csv", show_col_types = FALSE)
 u5 <- thr %>% dplyr::filter(tolower(model) %in% c("u5mr","u5","u5m")) %>%
-  dplyr::transmute(txt = sprintf("%.1f (%.1f-%.1f)", threshold_med_1000, threshold_lo_1000, threshold_hi_1000)) %>% 
+  dplyr::transmute(txt = sprintf("%.1f (%.1f-%.1f)", threshold_mean_1000, threshold_lo_1000, threshold_hi_1000)) %>%
   dplyr::pull(txt) %>% .[1]
 imr <- thr %>% dplyr::filter(tolower(model) %in% c("imr","infant")) %>%
-  dplyr::transmute(txt = sprintf("%.1f (%.1f-%.1f)", threshold_med_1000, threshold_lo_1000, threshold_hi_1000)) %>% 
+  dplyr::transmute(txt = sprintf("%.1f (%.1f-%.1f)", threshold_mean_1000, threshold_lo_1000, threshold_hi_1000)) %>%
   dplyr::pull(txt) %>% .[1]
 @
 
 \begin{itemize}[leftmargin=1.1em]
 \item \textbf{Purpose:} Express cessation thresholds for azithromycin MDA in standard demographic terms (IMR, U5MR) with uncertainty.
 \item \textbf{Key finding on context:} Baseline mortality explains most variation in benefit; other factors correlate with mortality but don't consistently modify treatment effects.
-\item \textbf{Cessation thresholds estimated:} U5MR \emph{median (95\% CrI)} = \Sexpr{u5} per 1,000; IMR \emph{median (95\% CrI)} = \Sexpr{imr} per 1,000.
+\item \textbf{Cessation thresholds estimated:} U5MR \emph{mean (95\% CrI)} = \Sexpr{u5} per 1,000; IMR \emph{mean (95\% CrI)} = \Sexpr{imr} per 1,000.
 \item \textbf{Program guidance:} Cease MDA when baseline mortality falls below these thresholds, with antimicrobial resistance surveillance in place.
 \end{itemize}
 
@@ -131,183 +134,406 @@ imr <- thr %>% dplyr::filter(tolower(model) %in% c("imr","infant")) %>%
 
 \section{Methods}
 
-We needed to solve four connected problems: determining standard patterns for how child mortality varies by age in our trial settings, estimating mortality in the trial communities, accounting for spatial patterns, and finding the mortality level where azithromycin stops working based on what we see in the trials. We tackled these in sequence.
+Our analytical approach addressed four interconnected challenges: establishing reliable age-specific mortality patterns for trial settings, anchoring these patterns in observed trial data, accounting for spatial correlation in community-level mortality, and identifying mortality thresholds where azithromycin benefits disappear. We developed a sequential four-stage Bayesian framework to address these challenges systematically.
 
-\subsection{Stage 1: Understanding age patterns of child mortality}
+\subsection{Stage 1: Demographic age patterns from household surveys}
 
-We started by building reliable age profiles of mortality risk from household surveys. Using complete birth histories from Burkina Faso, Malawi, Niger, Nigeria, and Tanzania (2010--2018), we calculated the follow-up times for each child and aggregated them according to standard demographic age bands: first month of life, months 1-11, months 12-23, and so on up to 59 months. Within each age group, we calculated the monthly probability of death, using survey weights to ensure our estimates represented the whole population. We then converted these to cumulative hazards for each age group:
+Trial clusters typically observe few deaths, making direct estimation of age-specific mortality patterns unstable. To address this, we leveraged complete birth histories from Demographic and Health Surveys (DHS) conducted in trial countries between 2010--2018: Burkina Faso, Malawi, Niger, Nigeria, and Tanzania. These nationally representative surveys provide robust age-specific mortality estimates that can inform trial-based modeling \citep{mercer2015aoas, wakefield2020insr}.
 
-\[
+\subsubsection{Age-specific hazard estimation}
+
+For each child in the birth histories, we calculated person-time contributions across standard demographic age intervals: neonatal ($0$ months), early post-neonatal ($1$--$11$ months), late post-neonatal ($12$--$23$ months), and subsequent yearly intervals through $59$ months. Within each age group $a$, we estimated monthly death probabilities $p_a$ using survey weights to ensure population representativeness. 
+
+We converted these probabilities to cumulative hazards, which provide a more natural scale for modeling rare events \citep{liu2016lancet}:
+
+\setstretch{1}
+\begin{equation}
 H_a = -n_a \log(1 - p_a),
-\]
+\end{equation}
 
-where $n_a$ is the number of months in each age group and $p_a$ is the estimated per-month death probability.
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$H_a$] = cumulative hazard for age group $a$
+\item[$n_a$] = number of months in age group $a$ 
+\item[$p_a$] = estimated monthly probability of death in age group $a$
+\end{description}
 
-This approach delivered clear age-specific mortality patterns with uncertainty properly quantified---crucial for everything that followed.
+\setstretch{1.5}
+\subsubsection{Neonatal-to-postneonatal bridge}
 
-\subsection{Stage 2: Anchoring estimates in trial data}
+Trial follow-up typically begins at age 1 month, necessitating prediction of neonatal mortality from observed post-neonatal patterns. We established this relationship using pooled DHS data through a log-linear regression model:
 
-Rather than relying solely on survey data, we anchored our mortality estimates to actual trial observations in two steps.
+\setstretch{1}
+\begin{equation}
+\log H_{0,c} = \gamma_c + \beta_1 \log H_{1\text{--}11,c} + \beta_2 \log H_{12\text{--}59,c} + \varepsilon_c,
+\end{equation}
 
-First, we used national-level survey data to estimate how neonatal mortality relates to later periods. We fit a relationship linking neonatal to older-age hazards:
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$H_{0,c}$] = neonatal cumulative hazard in country $c$
+\item[$H_{1\text{--}11,c}$] = early post-neonatal hazard (months 1--11) in country $c$
+\item[$H_{12\text{--}59,c}$] = late post-neonatal hazard (months 12--59) in country $c$
+\item[$\gamma_c$] = country-specific intercept
+\item[$\beta_1, \beta_2$] = regression coefficients (pooled across countries)
+\item[$\varepsilon_c$] = country-specific residual with estimated variance $\sigma^2_\varepsilon$
+\end{description}
 
-\[
-\log H_{0} = \gamma_{\text{country}} + \beta_{1}\log H_{1\text{--}11} + \beta_{2}\log H_{12\text{--}59} + \varepsilon,
-\]
+\setstretch{1.5}
+This model provides the foundation for predicting neonatal mortality in trial clusters from their observed post-neonatal patterns, with appropriate uncertainty propagation.
 
-This let us predict neonatal deaths from the post-neonatal patterns we could observe in trials.
+\subsection{Stage 2: Trial-anchored baseline priors}
 
-Second, we used deaths observed in placebo groups to set realistic expectations. We counted deaths in each cluster and modeled them with Poisson regression:
+While DHS surveys provide robust national age patterns, trial sites may differ systematically from national averages due to selection criteria, geographic clustering, or temporal changes. To ensure our mortality estimates reflect actual trial settings, we calibrated demographic priors using observed placebo data from each trial-country combination \citep{oron2020ajtmh}.
 
-\[
-\log \mathrm{E}[y_c] = \alpha + \log(E_c),
-\]
+\subsubsection{Baseline hazard estimation}
 
-where $y_c$ is deaths and $E_c$ is person-time in cluster $c$. We converted the results to cumulative hazards by scaling with interval length:
+For each trial-country group $g$, we estimated baseline mortality using observed deaths and person-time in placebo clusters. We fit a quasi-Poisson generalized linear model with cluster-robust standard errors to account for overdispersion:
 
-\[
-\log H_{a} = \alpha + \log(n_a/12),
-\]
+\setstretch{1}
+\begin{equation}
+\log \mathrm{E}[y_{c,g}] = \alpha_g + \log(E_{c,g}),
+\end{equation}
 
-This yielded realistic priors for each trial--country and age group, anchored in observed data.
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$y_{c,g}$] = observed deaths in placebo cluster $c$ within trial-country group $g$
+\item[$E_{c,g}$] = person-time at risk in cluster $c$, group $g$ (exposure offset)
+\item[$\alpha_g$] = log-hazard intercept for trial-country group $g$
+\end{description}
 
-\subsection{Stage 3: Mapping mortality across communities}
+\setstretch{1.5}
+We converted group-level intercepts to cumulative hazards for the 1--59 month age range:
 
-Estimating community-specific mortality was difficult as most clusters recorded few deaths. We addressed this with a hierarchical spatial model that shares strength across nearby locations while preserving genuine local departures.
+\begin{equation}
+\log H_{g,1\text{--}59} = \alpha_g + \log(59/12),
+\end{equation}
 
-\emph{Likelihood and baseline structure.} For each cluster \(i\) in trial–country group \(g\), placebo deaths \(y_i\) with exposure \(E_i\) follow
-\[
-y_i \sim \mathrm{Poisson}(\mu_i), 
-\qquad 
-\log \mu_i \;=\; \log E_i \;+\; \underbrace{\bigl[\mu_g + u_i + v_i\bigr]}_{\log \lambda_{i,1\text{--}59}},
-\]
-where \(\mu_g\) is the group mean (with a prior informed by the trial–country \(1\text{--}59\) hazard), \(u_i\) is a smooth spatial term, and \(v_i\) is a sparse local deviation. The spatial component uses a Hilbert–space reduced–rank Gaussian process (Matérn \(3/2\)) to capture broad geographic structure \citep{solin2020hilbert,riutort2023practical}; the local term is regularized with a horseshoe prior to distinguish real outliers from noise \citep{carvalho2010horseshoe}. Weakly informative priors follow standard principles for penalized complexity/regularization \citep{simpson2017pc}.
+\noindent where the scaling factor $59/12$ converts monthly rates to cumulative hazards over 59 months.
 
-\emph{Age composition.} To recover IMR and U5MR consistently, we split the \(1\text{--}59\) hazard into early (1–11) and late (12–59) components using a conjugate Beta–binomial share at the trial–country level. Let \(p_g\) denote the fraction of the \(1\text{--}59\) hazard occurring in months 1–11. With deaths \(d_{g,1\text{--}11}\) and \(d_{g,12\text{--}59}\),
-\[
-p_g \mid \text{data} \sim \mathrm{Beta}\!\bigl(\alpha_{g,0}+d_{g,1\text{--}11},\, \beta_{g,0}+d_{g,12\text{--}59}\bigr).
-\]
-Combining \(p_g\) with the fitted cluster-level rate \(\lambda_{i,1\text{--}59}\) yields age–specific rates
-\[
-\log \lambda_{i,1\text{--}11} \;=\; \log \lambda_{i,1\text{--}59} + \log p_g + \log\!\frac{59}{11}, 
-\qquad
-\log \lambda_{i,12\text{--}59} \;=\; \log \lambda_{i,1\text{--}59} + \log(1-p_g) + \log\!\frac{59}{48},
-\]
-so that the implied cumulative hazards satisfy 
-\(H_{i,1\text{--}11}=\lambda_{i,1\text{--}11}\,(11/12)\),
-\(H_{i,12\text{--}59}=\lambda_{i,12\text{--}59}\,(48/12)\), and
-\(H_{i,1\text{--}59}=H_{i,1\text{--}11}+H_{i,12\text{--}59}\).
+\subsubsection{Age decomposition through Beta-binomial updating}
 
-\emph{Neonatal bridge.} Finally the neonatal hazard was linked to the post–neonatal components via a country–specific regression,
-\[
-\log H_{i,0} \;=\; \alpha_c \;+\; \beta_1 \log H_{i,1\text{--}11} \;+\; \beta_2 \log H_{i,12\text{--}59} \;+\; \varepsilon_c,
-\]
-with \((\alpha_c,\beta_1,\beta_2)\) drawn from the pooled DHS model (fixed residual scale).
+To decompose the 1--59 month hazard into early (1--11) and late (12--59) components, we used observed age-specific deaths to update DHS-derived Beta priors. Let $p_g$ denote the fraction of total 1--59 month hazard occurring in months 1--11. With observed deaths $d_{g,1\text{--}11}$ and $d_{g,12\text{--}59}$ in each age group:
 
-The result is a coherent posterior over cluster-level hazards \(\{H_{i,0},H_{i,1\text{--}11},H_{i,12\text{--}59}\}\) and thus IMR/U5MR, smoothly varying in space, anchored by observed placebo counts, and age-decomposed through the Beta–binomial share.
+\setstretch{1}
+\begin{equation}
+p_g \mid \text{data} \sim \text{Beta}(\alpha_{g,0} + d_{g,1\text{--}11}, \beta_{g,0} + d_{g,12\text{--}59}),
+\end{equation}
 
-\subsection{Stage 4: Looking beyond baseline mortality}
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$p_g$] = fraction of 1--59 month hazard in early post-neonatal period
+\item[$\alpha_{g,0}, \beta_{g,0}$] = DHS-derived Beta prior parameters for trial-country $g$
+\item[$d_{g,1\text{--}11}, d_{g,12\text{--}59}$] = observed placebo deaths by age group
+\end{description}
 
-While baseline mortality clearly matters most, we wanted to see if other factors modified treatment effects. We gathered data on vaccination coverage (DPT1, DPT3, BCG, measles, polio) from IHME gridded surfaces \citep{golding2017lancet} and malaria indicators (incidence, mortality, bed net coverage) from the Malaria Atlas project. We also created some immunization composite measures (geometric mean coverage, first principal component).
+\setstretch{1.5}
+This Bayesian updating provides trial-calibrated age shares while maintaining connection to established demographic patterns, enabling robust uncertainty quantification throughout subsequent modeling stages.
 
-We linked these to trial clusters based on the longitude and latitude and for each covariate, we fit three nested Poisson generalized linear mixed models with exposure offsets and cluster random intercepts:
+\subsection{Stage 3: Bayesian spatial mortality estimation}
 
-\textbf{Base model:}
+Individual trial clusters typically observe few deaths, making direct mortality estimation highly unstable. However, nearby clusters often share similar epidemiological conditions, suggesting that spatial borrowing of information can improve estimation precision while preserving genuine local variation \citep{besag1991bym, riebler2016bym2}. We developed a hierarchical spatial model that balances these competing objectives through principled regularization.
+
+\subsubsection{Hierarchical likelihood structure}
+
+For each cluster $i$ in trial-country group $g$, we modeled observed placebo deaths as:
+
+\begin{equation}
+y_i \sim \text{Poisson}(\mu_i),
+\end{equation}
+
+\noindent with log-linear predictor:
+
+\setstretch{1}
+\begin{equation}
+\log \mu_i = \log E_i + \underbrace{[\mu_g + u_i + v_i]}_{\log \lambda_{i,1\text{--}59}},
+\end{equation}
+
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$y_i$] = observed deaths in placebo cluster $i$
+\item[$E_i$] = person-time at risk in cluster $i$ (exposure offset)
+\item[$\mu_g$] = trial-country group mean (from Stage 2 calibration)
+\item[$u_i$] = smooth spatial deviation for cluster $i$
+\item[$v_i$] = sparse local deviation for cluster $i$
+\item[$\lambda_{i,1\text{--}59}$] = cluster-specific mortality rate (ages 1--59 months)
+\end{description}
+
+\setstretch{1.5}
+\subsubsection{Spatial process specification}
+
+The smooth spatial component $u_i$ follows a Matérn covariance process with smoothness parameter $\nu = 3/2$, implemented through Hilbert Space Gaussian Process (HSGP) approximation \citep{solin2020hilbert, riutort2023practical}. This approach provides computational efficiency while maintaining flexibility in capturing geographic mortality patterns.
+
+The spatial process is defined by:
+\setstretch{1}
+\begin{align}
+u(\mathbf{s}) &\sim \text{GP}(0, C(\mathbf{s}, \mathbf{s}'; \rho, \sigma_u^2)) \\
+C(\mathbf{s}, \mathbf{s}'; \rho, \sigma_u^2) &= \sigma_u^2 \left(1 + \frac{\sqrt{3}||\mathbf{s} - \mathbf{s}'||}{\rho}\right) \exp\left(-\frac{\sqrt{3}||\mathbf{s} - \mathbf{s}'||}{\rho}\right),
+\end{align}
+
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$\mathbf{s}$] = spatial coordinates (longitude, latitude)
+\item[$\rho$] = spatial range parameter
+\item[$\sigma_u^2$] = spatial variance parameter
+\item[$C(\cdot, \cdot; \rho, \sigma_u^2)$] = Matérn 3/2 covariance function
+\end{description}
+
+\setstretch{1.5}
+\subsubsection{Local deviation regularization}
+
+The local deviation terms $v_i$ use regularized horseshoe priors \citep{carvalho2010horseshoe, piironen2017hyper} to distinguish genuine outliers from noise:
+
+\setstretch{1}
+\begin{align}
+v_i &\sim \text{Normal}(0, \tau \tilde{\lambda}_i) \\
+\tilde{\lambda}_i &\sim \text{CauchyPos}(0, 1) \\
+\tau &\sim \text{CauchyPos}(0, \tau_0),
+\end{align}
+
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$\tau$] = global shrinkage parameter
+\item[$\tilde{\lambda}_i$] = local shrinkage parameter for cluster $i$
+\item[$\tau_0$] = prior scale based on expected sparsity
+\item[$\text{CauchyPos}(0, \sigma)$] = positive half-Cauchy distribution with scale $\sigma$
+\end{description}
+
+\setstretch{1.5}
+This specification provides adaptive shrinkage: clusters with weak evidence for local departures are shrunk toward the spatial mean, while genuine outliers are preserved.
+
+\subsubsection{Age decomposition}
+
+To recover standard demographic indicators (IMR, U5MR), we decomposed the fitted 1--59 month hazard into constituent age groups. Using the trial-calibrated Beta-binomial shares from Stage 2:
+
+\begin{equation}
+p_g \mid \text{data} \sim \text{Beta}(\alpha_{g,0} + d_{g,1\text{--}11}, \beta_{g,0} + d_{g,12\text{--}59}),
+\end{equation}
+
+\noindent we computed age-specific rates:
+
+\setstretch{1}
+\begin{align}
+\log \lambda_{i,1\text{--}11} &= \log \lambda_{i,1\text{--}59} + \log p_g + \log(59/11) \\
+\log \lambda_{i,12\text{--}59} &= \log \lambda_{i,1\text{--}59} + \log(1-p_g) + \log(59/48),
+\end{align}
+
+\noindent where the scaling factors ensure proper hazard partitioning. Converting to cumulative hazards:
+
+\begin{align}
+H_{i,1\text{--}11} &= \lambda_{i,1\text{--}11} \times (11/12) \\
+H_{i,12\text{--}59} &= \lambda_{i,12\text{--}59} \times (48/12) \\
+H_{i,1\text{--}59} &= H_{i,1\text{--}11} + H_{i,12\text{--}59}
+\end{align}
+
+\setstretch{1.5}
+\subsubsection{Neonatal prediction}
+
+Finally, we predicted neonatal hazards using the country-specific bridge relationships from Stage 1:
+
+\begin{equation}
+\log H_{i,0} = \alpha_c + \beta_1 \log H_{i,1\text{--}11} + \beta_2 \log H_{i,12\text{--}59} + \varepsilon_c,
+\end{equation}
+
+\noindent where $(\alpha_c, \beta_1, \beta_2, \sigma_\varepsilon)$ are fixed at DHS-derived values with appropriate uncertainty propagation.
+
+The complete model yields posterior distributions over cluster-specific hazards $\{H_{i,0}, H_{i,1\text{--}11}, H_{i,12\text{--}59}\}$, enabling calculation of standard demographic indicators with full uncertainty quantification:
+\begin{align}
+\text{IMR}_i &= 1000 \times (1 - \exp(-H_{i,0})) \\
+\text{U5MR}_i &= 1000 \times (1 - \exp(-(H_{i,0} + H_{i,1\text{--}11} + H_{i,12\text{--}59})))
+\end{align}
+
+\subsection{Stage 4: Contextual heterogeneity analysis}
+
+While baseline mortality provides a parsimonious threshold criterion, treatment effects may be modified by contextual factors beyond overall mortality levels. Vaccination coverage, malaria burden, and healthcare access could plausibly influence azithromycin's mechanisms of action \citep{golding2017lancet}. We systematically assessed whether such factors (1) explain baseline mortality variation and (2) modify treatment effects beyond mortality-based predictors.
+
+\subsubsection{Covariate data sources}
+
+We compiled contextual indicators from established global health databases:
+\begin{itemize}
+\item \textbf{Vaccination coverage:} DPT1, DPT3, BCG, measles, and polio coverage from IHME gridded surfaces \citep{golding2017lancet}
+\item \textbf{Malaria burden:} Incidence, mortality, and bed net coverage from the Malaria Atlas Project
+\item \textbf{Composite measures:} Geometric mean vaccination coverage and first principal component of vaccination indicators
+\end{itemize}
+
+Covariates were spatially linked to trial clusters using longitude-latitude coordinates, with temporal alignment to trial periods where available. For vaccination indicators, we used immunization gaps (1 - coverage) to ensure consistent interpretation where higher values indicate worse conditions.
+
+\subsubsection{Nested model framework}
+
+For each covariate $x$, we fit three nested Poisson generalized linear mixed models to assess explanatory and modifying effects. All models included exposure offsets, natural cubic splines for age, and cluster random intercepts:
+
+\setstretch{1}
+\textbf{Base model (mortality only):}
 \begin{equation}
 \log \mu_{iat} = \log E_{iat} + \beta_0 + f(a) + b_i
 \end{equation}
 
-\textbf{Covariate model:}
+\textbf{Covariate model (explanatory effect):}
 \begin{equation}
 \log \mu_{iat} = \log E_{iat} + \beta_0 + \beta_1 x_i + f(a) + b_i
 \end{equation}
 
-\textbf{Interaction model:}
+\textbf{Interaction model (modifying effect):}
 \begin{equation}
-\log \mu_{iat} = \log E_{iat} + \beta_0 + \beta_1 x_i + \beta_2 \mathbb{1}\{t=\text{AZI}\} + \beta_3 (x_i \times \mathbb{1}\{t=\text{AZI}\}) + f(a) + b_i
+\log \mu_{iat} = \log E_{iat} + \beta_0 + \beta_1 x_i + \beta_2 T_{it} + \beta_3 (x_i \times T_{it}) + f(a) + b_i
 \end{equation}
 
-where $f(a)$ is a natural cubic spline with interior knots at ages 5.5, 11.5, 23.5, and 41.5 months.
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$\mu_{iat}$] = expected deaths for cluster $i$, age group $a$, treatment arm $t$
+\item[$E_{iat}$] = person-time exposure (offset)
+\item[$x_i$] = standardized covariate value for cluster $i$
+\item[$T_{it}$] = treatment indicator ($1$ if azithromycin, $0$ if placebo)
+\item[$f(a)$] = natural cubic spline with knots at 5.5, 11.5, 23.5, 41.5 months
+\item[$b_i$] = cluster random intercept $\sim \text{Normal}(0, \sigma_b^2)$
+\item[$\beta_0$] = intercept
+\item[$\beta_1$] = covariate main effect
+\item[$\beta_2$] = treatment main effect  
+\item[$\beta_3$] = covariate-treatment interaction effect
+\end{description}
 
-Likelihood ratio tests compare nested models to assess: (1) whether covariates explain mortality variation, and (2) whether covariates modify treatment effects.
+\setstretch{1.5}
+\subsubsection{Statistical inference}
 
-\subsection{Stage 5: Finding cessation thresholds}
+We used likelihood ratio tests to compare nested models:
+\begin{itemize}
+\item \textbf{Explanatory test:} Covariate vs. Base model tests whether $\beta_1 \neq 0$
+\item \textbf{Modifying test:} Interaction vs. Covariate model tests whether $\beta_3 \neq 0$
+\end{itemize}
 
-Our main goal was identifying the mortality level (first for U5MR and then for IMR, separately) where azithromycin's benefit disappears. We implemented two complementary approaches to ensure robust threshold estimation.
+Models were fit using restricted maximum likelihood with robust variance estimation to account for clustering and overdispersion.
+
+\subsection{Stage 5: Cessation threshold estimation}
+
+Our primary objective was identifying mortality levels where azithromycin's survival benefit disappears, providing empirical cessation criteria. This requires modeling how treatment effects vary continuously with baseline mortality rather than simply testing for effect modification \citep{oron2020ajtmh}.
 
 \subsubsection{Interaction model specification}
 
-Both approaches used the same underlying model structure, allowing treatment effects to vary with baseline mortality:
+We specified treatment-mortality interaction models separately for U5MR and IMR outcomes:
 
-\[
-\log \mu_i = \alpha_{g[i]} + \beta_m \log M_i + T_i(\beta_t + \beta_{tm}\log M_i) + \log E_i,
-\]
+\setstretch{1}
+\begin{equation}
+\log \mu_i = \alpha_{g[i]} + \beta_m \log M_i + T_i(\beta_t + \beta_{tm} \log M_i) + \log E_i,
+\end{equation}
 
-The crucial component is the interaction term $\beta_{tm}\log M_i$---this lets treatment effects change with baseline mortality $M_i$. We treated mortality estimates as uncertain rather than fixed values, incorporating full posterior distributions from our spatial modeling.
+\noindent where:
+\begin{description}[leftmargin=2em]
+\item[$\mu_i$] = expected deaths in cluster $i$
+\item[$\alpha_{g[i]}$] = trial-country group intercept for cluster $i$
+\item[$M_i$] = baseline mortality (U5MR or IMR) for cluster $i$
+\item[$T_i$] = treatment assignment indicator
+\item[$\beta_m$] = baseline mortality slope (log scale)
+\item[$\beta_t$] = treatment main effect
+\item[$\beta_{tm}$] = treatment-mortality interaction coefficient
+\item[$E_i$] = person-time exposure (offset)
+\end{description}
 
-\subsubsection{Analytical approach}
+\setstretch{1.5}
+The interaction term $\beta_{tm} \log M_i$ allows treatment effects to vary continuously with baseline mortality. Crucially, we incorporated uncertainty in baseline mortality estimates by sampling $M_i$ values from their posterior distributions (Stage 3) rather than treating them as fixed quantities.
 
-The analytical method exploits the mathematical structure of the interaction model. Treatment effects become zero when:
+\subsubsection{Analytical threshold derivation}
 
-\[
-\beta_t + \beta_{tm} \log M^* = 0,
-\]
+Treatment effects become null when the treatment coefficient equals zero:
+\begin{equation}
+\beta_t + \beta_{tm} \log M^* = 0
+\end{equation}
 
 Solving for the threshold mortality level:
+\begin{equation}
+M^* = \exp\left(-\frac{\beta_t}{\beta_{tm}}\right)
+\end{equation}
 
-\[
-M^* = \exp\left(-\frac{\beta_t}{\beta_{tm}}\right).
-\]
+For each MCMC posterior draw $j$, we computed:
+\begin{equation}
+M^*_j = \exp\left(-\frac{\beta_{t,j}}{\beta_{tm,j}}\right)
+\end{equation}
 
-This approach provides direct threshold estimates for each MCMC draw, yielding full posterior distributions with computational efficiency. However, it can be unstable as the $\beta_{tm}$ parameter approaches zero - which is particularly a challenge when baseline mortality is assumed to be a random variable.
+This yields full posterior distributions for cessation thresholds, enabling principled uncertainty quantification. However, this approach can become unstable when $\beta_{tm,j} \approx 0$, necessitating validation through alternative methods.
 
-\subsubsection{Crossing-based approach}
+\subsubsection{Crossing-based threshold validation}
 
-The crossing method generates predicted rates across a dense mortality grid. For each set of posterior draws, we calculated:
+As a robust alternative, we implemented a crossing-based approach that directly identifies mortality levels where predicted treatment and placebo rates intersect. For each posterior draw, we computed predicted death rates across a dense mortality grid:
 
-\[
-\lambda_{\text{placebo}}(M) = \exp(\alpha + \beta_m \log M),
-\]
-\[
-\lambda_{\text{treatment}}(M) = \exp(\alpha + \beta_m \log M + \beta_t + \beta_{tm} \log M).
-\]
+\begin{align}
+\lambda_{\text{placebo}}(M) &= \exp(\alpha + \beta_m \log M) \\
+\lambda_{\text{treatment}}(M) &= \exp(\alpha + \beta_m \log M + \beta_t + \beta_{tm} \log M)
+\end{align}
 
-We then identified mortality levels $M^*$ where $\lambda_{\text{treatment}}(M^*) = \lambda_{\text{placebo}}(M^*)$, using linear interpolation between grid points to locate exact crossings.
+We identified crossing points $M^*$ where:
+\begin{equation}
+\lambda_{\text{treatment}}(M^*) = \lambda_{\text{placebo}}(M^*)
+\end{equation}
 
-The crossing-based approach provides a direct visualization of treatment benefit disappearing and serves as a validation for the analytical method.
+using linear interpolation between grid points to ensure precise threshold estimates.
+
+This approach provides direct visualization of treatment benefit disappearance and serves as validation for analytical estimates. Both methods incorporate full posterior uncertainty, yielding credible intervals for cessation thresholds that reflect both parameter estimation uncertainty and baseline mortality estimation uncertainty.
 
 \subsection{Sensitivity analysis}
 
-To assess the robustness of our threshold estimates, we implemented a comprehensive sensitivity analysis across multiple modeling frameworks and data subsets.
+Threshold estimation presents unique challenges for robustness assessment. Unlike standard effect size estimation, thresholds depend on precise identification of mortality levels where treatment effects become null, making them potentially sensitive to modeling assumptions, influential observations, and computational approaches. We implemented a comprehensive sensitivity analysis to ensure our cessation recommendations are robust across alternative specifications and data subsets.
 
-\subsubsection{Modeling approaches}
+\subsubsection{Alternative modeling frameworks}
 
-We compared threshold estimates across three distinct modeling approaches:
+We compared threshold estimates across three methodologically distinct approaches, each representing different assumptions about uncertainty propagation and computational implementation:
+
+\textbf{Stan variable baseline (primary approach):}
+\begin{equation}
+M_i \sim \text{Posterior distribution from Stage 3 spatial model}
+\end{equation}
+This approach treats baseline mortality as uncertain, sampling $M_{i,j}$ values from full posterior distributions for each MCMC iteration $j$. This properly propagates spatial modeling uncertainty into threshold estimation but requires careful handling of nested uncertainty structures.
+
+\textbf{Stan fixed baseline (alternative):}
+\begin{equation}
+M_i = \text{E}[\text{Posterior}_{i}] \quad \text{(point estimates)}
+\end{equation}
+Uses posterior means from spatial modeling as fixed covariates, eliminating baseline uncertainty propagation. This approach tests whether uncertainty in mortality estimates substantially affects threshold inference while maintaining the interaction model structure.
+
+\textbf{INLA implementation (computational validation):}
+\begin{equation}
+M_i = \hat{M}_i \quad \text{(empirical estimates)}
+\end{equation}
+Independent implementation using Integrated Nested Laplace Approximation \citep{lindgren2015bayesian} with empirically derived mortality estimates. This provides computational cross-validation using a fundamentally different inference engine while maintaining equivalent model structures.
+
+\subsubsection{Sequential exclusion analysis}
+
+To assess sensitivity to influential trial sites, we systematically excluded each major trial-country combination and re-estimated thresholds using the INLA framework:
+
 \begin{itemize}
-\item \textbf{Stan variable baseline:} Our primary approach using hierarchical trial-country random effects with mortality treated as uncertain (sampled from baseline posterior distributions).
-
-\item \textbf{Stan fixed baseline:} Alternative specification using point estimates of baseline mortality rather than full posterior distributions.
-
-\item \textbf{INLA implementation:} Independent implementation using integrated nested Laplace approximation for computational validation, with mortality treated as fixed covariates.
+\item \textbf{Niger MORDOR I/II exclusion:} Tests sensitivity to the largest, highest-mortality trial component (594 clusters, 5,253 deaths)
+\item \textbf{Niger AVENIR exclusion:} Assesses influence of the most extensive geographic coverage (2,158 clusters across Niger)
+\item \textbf{Tanzania MORDOR I exclusion:} Evaluates impact of the lowest-mortality trial setting (360 deaths, 613 clusters)
+\item \textbf{Malawi MORDOR I exclusion:} Tests influence of intermediate mortality levels (304 clusters, 1,044 deaths)
+\item \textbf{Burkina Faso CHAT exclusion:} Assesses impact of the most recent trial data (285 clusters, 1,086 deaths)
 \end{itemize}
 
-\subsubsection{Sequential exclusions}
+This systematic exclusion approach tests whether threshold estimates are driven by specific high-leverage trial locations or represent consistent patterns across diverse epidemiological settings. Each exclusion removes approximately 7-55\% of total clusters and 3-45\% of observed deaths, providing substantial perturbations to test robustness.
 
-We systematically excluded each trial location to assess sensitivity to influential sites:
+\subsubsection{Threshold calculation method comparison}
 
+For each modeling scenario described above, we computed cessation thresholds using both analytical and crossing-based approaches (detailed in Stage 5):
+
+\textbf{Analytical method:}
+\begin{equation}
+M^*_j = \exp\left(-\frac{\beta_{t,j}}{\beta_{tm,j}}\right)
+\end{equation}
+
+\textbf{Crossing-based method:}
+\begin{equation}
+\lambda_{\text{treatment}}(M^*_j) = \lambda_{\text{placebo}}(M^*_j)
+\end{equation}
+
+This dual-method approach serves multiple purposes: (1) cross-validation of computational implementation, (2) assessment of sensitivity to numerical instabilities when $\beta_{tm,j} \approx 0$, and (3) evaluation of threshold estimate precision across different identification strategies.
+
+\subsubsection{Sensitivity metrics and evaluation criteria}
+
+We assessed robustness using multiple complementary measures:
 \begin{itemize}
-\item INLA excluding Niger MORDOR I/II
-\item INLA excluding Niger AVENIR  
-\item INLA excluding Tanzania MORDOR I
-\item INLA excluding Malawi MORDOR I
-\item INLA excluding Burkina Faso CHAT
+\item \textbf{Central tendency stability:} Comparison of posterior means across scenarios
+\item \textbf{Uncertainty propagation:} Assessment of credible interval overlap between approaches  
+\item \textbf{Tail behavior:} Evaluation of extreme percentiles (2.5th, 97.5th) across methods
+\item \textbf{Convergence diagnostics:} $\hat{R}$ statistics and effective sample sizes for all implementations
 \end{itemize}
 
-This sequential exclusion approach tests whether specific trial locations drive overall threshold estimates.
-
-\subsubsection{Threshold calculation methods}
-
-For each modeling scenario, we computed thresholds using both analytical and crossing-based methods, allowing assessment of method-specific sensitivity alongside model specification sensitivity.
+Results showing consistency across these metrics provide confidence that threshold recommendations are robust to reasonable alternative specifications and not driven by particular modeling choices or influential observations.
 
 \section{Results}
 
@@ -315,7 +541,7 @@ For each modeling scenario, we computed thresholds using both analytical and cro
 
 Our dataset comprised 3,954 clusters across five trial-country combinations, covering 1.63 million children who contributed 794,318 person-years of follow-up. During this time, 11,580 deaths were recorded (Table~\ref{tab:analysis-sample}). These figures closely match denominators reported in original trial publications \citep{keenan2018nejm, oldenburg2024jama, o2024azithromycin}, confirming data completeness.
 
-\linespread{1.2}
+\setstretch{1}
 \begin{table}[!h]
 \centering
 \caption{\emph{Sample characteristics by trial--country setting, ages 1--59 months}}
@@ -334,11 +560,11 @@ MORDOR I/II & Niger        &   594 & 400,111 & 5,253 & 205,360 \\
 \bottomrule
 \end{tabular}
 \end{table}
-\linespread{1.5}
+\setstretch{1.5}
 
 \subsection{Baseline mortality patterns}
 
-Our spatial modeling successfully estimated mortality for all clusters with appropriate uncertainty. Figure~\ref{fig:prior-post-u5m} shows how this worked: orange distributions are raw cluster estimates (quite variable), while blue distributions show our final estimates after spatial smoothing (more stable). We see how the posterior shrinks towards the prior (given by the dashed line and shaded area and also in the subtitle)---reducing extreme estimates while maintaining genuine variation between locations. This gives us reliable mortality estimates that reflect both local conditions and broader patterns. 
+Our spatial modeling successfully estimated mortality for all clusters with appropriate uncertainty. Figure~\ref{fig:prior-post-u5m} shows how this worked: orange distributions are raw cluster estimates (quite variable), while blue distributions show our final estimates after spatial smoothing (more stable). We see how the posterior shrinks towards the prior (given by the dashed line and shaded area and also in the subtitle)---reducing extreme estimates while maintaining genuine variation between locations. This gives us reliable mortality estimates that reflect both local conditions and broader patterns.
 
 \begin{figure}[!h]
 \centering
@@ -347,6 +573,7 @@ Our spatial modeling successfully estimated mortality for all clusters with appr
 \label{fig:prior-post-u5m}
 \end{figure}
 
+\newpage
 \emph{SPDE validation.} To validate our HSGP approach, we implemented an alternative specification using stochastic partial differential equations (SPDE) via INLA \citep{lindgren2011explicit, lindgren2015bayesian}. The SPDE approach represents the spatial field $u(\mathbf{s})$ as the solution to
 
 \[
@@ -361,7 +588,7 @@ y_i \sim \mathrm{NegBin}(\mu_i, \phi), \qquad \log \mu_i = \log E_i + \beta_0 + 
 
 with penalized complexity priors on range and marginal variance parameters \citep{fuglstad2019pcgrf}.
 
-The SPDE implementation yielded cluster-level mortality estimates highly correlated with our HSGP + HS results across all trial-country combinations (Figure~\ref{fig:spde-post-u5m}). The SPDE approach provides a useful benchmark for validating our HSGP with horseshoe results. As shown in Figure~\ref{fig:spde-post-u5m}, posterior distributions from the SPDE (green) and HSGP (blue) align closely across trial–countries, both in central tendency and distributional shape. Because SPDE relies on a mesh-based approximation of Matérn fields, independent of the basis-function construction in HSGP, the agreement confirms that the HSGP estimates are not artefacts of model specification but instead capture the underlying mortality patterns robustly. 
+The SPDE implementation yielded cluster-level mortality estimates highly correlated with our HSGP + HS results across all trial-country combinations (Figure~\ref{fig:spde-post-u5m}). The SPDE approach provides a useful benchmark for validating our HSGP with horseshoe results. As shown in Figure~\ref{fig:spde-post-u5m}, posterior distributions from the SPDE (green) and HSGP (blue) align closely across trial–countries, both in central tendency and distributional shape. Because SPDE relies on a mesh-based approximation of Matérn fields, independent of the basis-function construction in HSGP, the agreement confirms that the HSGP estimates are not artefacts of model specification but instead capture the underlying mortality patterns robustly.
 
 \begin{figure}[!h]
 \centering
@@ -377,12 +604,12 @@ However, the SPDE approach requires multi-stage modeling to propagate uncertaint
 
 Translation to standard demographic indicators also worked well. Table~\ref{tab:agedem} shows mortality estimates by trial-country and treatment group. IMR:U5MR ratios stay within expected bounds (0.5--0.65), validating our approach. Treatment and placebo groups within each trial-country show similar estimates, supporting successful prediction out-of-sample (only placebo where used to estimate baseline).
 
-\linespread{1.2}
+\setstretch{1}
 <<age-decomp-table, echo=FALSE, results='asis', message=FALSE, warning=FALSE>>=
 path_csv <- "../results/age_decomp_summary.csv"
 if(file.exists(path_csv)) {
   age_decomp_summary <- read_csv(path_csv, show_col_types = FALSE)
-  
+
   tab_age <- age_decomp_summary %>%
     mutate(
       `IMR mean`   = sprintf("%.1f", imr_mean),
@@ -394,27 +621,27 @@ if(file.exists(path_csv)) {
     arrange(trial_phase, country, trt) %>%
     mutate(
       `Trial--Country` = paste(trial_phase, country),
-      IMR = paste0(`IMR mean`, " (", `IMR SD`, ")"), 
+      IMR = paste0(`IMR mean`, " (", `IMR SD`, ")"),
       U5MR = paste0(`U5MR mean`, " (", `U5MR SD`, ")"),
       Treatment = ifelse(trt == 1, "Azithromycin", "Placebo")
     ) %>%
-    select(`Trial--Country`, Treatment, 
-           `IMR (mean and SD)` = IMR, 
+    select(`Trial--Country`, Treatment,
+           `IMR (mean and SD)` = IMR,
            `U5MR (mean and SD)` = U5MR,
            Ratio = `IMR:U5MR`)
-  
+
   kable(
     tab_age,
  caption = "\\label{tab:agedem}\\emph{Baseline mortality estimates by trial-country and treatment arm}",
     booktabs = TRUE,
     align = c("l","l","r","r","r"),
     linesep = c("","\\midrule", "","\\midrule", "","\\midrule", "","\\midrule", "", "\\midrule", "","\\midrule", "","\\midrule", "","\\midrule", "","\\midrule")
-  )
+  ) %>% kable_styling(latex_options = "HOLD_position")
 } else {
   cat("\\textit{Table data not available during compilation.}")
 }
 @
-\linespread{1.5}
+\setstretch{1.5}
 
 \subsection{Contextual heterogeneity}
 
@@ -422,7 +649,7 @@ We systematically tested whether factors beyond baseline mortality might predict
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=0.7\textwidth]{../results/figs/correlation_matrix.png}
+\fbox{\includegraphics[width=0.75\textwidth]{../results/figs/correlation_matrix.png}}
 \caption{\emph{Contextual factors correlate with baseline mortality as expected}}
 \label{fig:correlation-matrix}
 \end{figure}
@@ -431,7 +658,7 @@ The key question was whether these factors modified treatment effects beyond the
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=1\textwidth]{../results/figs/contextual_pvalue_heatmap.png}
+\fbox{\includegraphics[width=1\textwidth]{../results/figs/contextual_pvalue_heatmap.png}}
 \caption{\emph{Contextual factors predict mortality but don't systematically modify treatment effects}}
 \label{fig:contextual-analysis}
 \end{figure}
@@ -456,9 +683,9 @@ thr_tab <- threshold_results %>%
       tolower(model) %in% c("imr","infant")    ~ "Infant mortality (IMR)",
       TRUE ~ as.character(model)
     ),
-    `Threshold (per 1,000)` = sprintf("%.1f (%.1f-%.1f)", 
-                                    threshold_med_1000, 
-                                    threshold_lo_1000, 
+    `Threshold (per 1,000)` = sprintf("%.1f (%.1f-%.1f)",
+                                    threshold_mean_1000,
+                                    threshold_lo_1000,
                                     threshold_hi_1000)
   ) %>%
   arrange(factor(Model, levels = c("Under-five mortality (U5MR)", "Infant mortality (IMR)"))) %>%
@@ -467,10 +694,10 @@ thr_tab <- threshold_results %>%
 kable(
   thr_tab,
   caption = "\\label{tab:thresholds}\\emph{Data-driven cessation thresholds for azithromycin MDA programs}",
-  booktabs = TRUE, 
+  booktabs = TRUE,
   align = c("l","r"),
   linesep = ""
-)
+) %>% kable_styling(latex_options = "HOLD_position")
 @
 
 The U5MR-based threshold is \Sexpr{thr_tab$`Threshold (per 1,000)`[1]} per 1,000 live births; the IMR-based threshold is \Sexpr{thr_tab$`Threshold (per 1,000)`[2]} per 1,000 live births. Figure~\ref{fig:threshold-analysis} shows both the uncertainty around these thresholds (left panel) and the statistical evidence supporting them (right panel).
@@ -484,24 +711,20 @@ The U5MR-based threshold is \Sexpr{thr_tab$`Threshold (per 1,000)`[1]} per 1,000
 
 The model coefficients show clear evidence for treatment-mortality interactions, with negative interaction terms indicating diminishing benefits as baseline mortality increases---exactly what we need for meaningful threshold identification.
 
-The prediction curves (Figures~\ref{fig:mortality-predictions1} and \ref{fig:mortality-predictions2}) show how this works in practice. At high mortality levels, treatment and placebo groups have very different predicted death rates---azithromycin provides substantial benefit. As baseline mortality drops, these curves converge until they cross at our estimated thresholds. Below these crossing points, azithromycin provides no meaningful benefit.
+\newpage
+The prediction curves (Figure~\ref{fig:mortality-predictions} show how this works in practice. At high mortality levels, treatment and placebo groups have very different predicted death rates---azithromycin provides substantial benefit. As baseline mortality drops, these curves converge until they cross at our estimated thresholds. Below these crossing points, azithromycin provides no meaningful benefit.
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=\textwidth]{../results/figs/threshold_u5mr.pdf}
-\caption{\emph{Treatment benefits vanish as baseline under-five mortality increases}}
-\label{fig:mortality-predictions1}
-\end{figure}
-
-\begin{figure}[!h]
-\centering
-\includegraphics[width=\textwidth]{../results/figs/threshold_imr.pdf}
-\caption{\emph{Treatment benefits vanish as baseline infant mortality increases}}
-\label{fig:mortality-predictions2}
+\includegraphics[width=.85\textwidth]{../results/figs/threshold_u5mr.pdf}
+\includegraphics[width=.85\textwidth]{../results/figs/threshold_imr.pdf}
+\caption{\emph{Treatment benefits vanish as baseline U5MR/IMR increase}}
+\label{fig:mortality-predictions}
 \end{figure}
 
 The uncertainty ranges around these thresholds acknowledge the limits of available data while providing actionable guidance for program managers.
 
+\newpage
 \subsection{Sensitivity analysis}
 
 To assess robustness, we tested our threshold estimates across multiple modeling approaches and data subsets. Figure~\ref{fig:crossing-sensitivity} shows threshold distributions using the crossing method across eight scenarios, while Figure~\ref{fig:analytical-sensitivity} shows results from the analytical approach.
@@ -525,28 +748,28 @@ To assess robustness, we tested our threshold estimates across multiple modeling
 all_results_path <- "../results/all_threshold_results.csv"
 if(file.exists(all_results_path)) {
   all_results <- read_csv(all_results_path, show_col_types = FALSE)
-  
+
   # Create summary table like in presentation
   summary_table <- all_results %>%
-    filter(!is.na(median)) %>%
+    filter(!is.na(mean)) %>%
     mutate(
-      ci_display = sprintf("%.1f (%.1f-%.1f)", median, lower, upper)
+      ci_display = sprintf("%.1f (%.1f-%.1f)", mean, lower, upper)
     ) %>%
     select(scenario, model, type, ci_display) %>%
     pivot_wider(
-      names_from = c(model, type), 
+      names_from = c(model, type),
       values_from = ci_display,
       names_sep = "_"
     ) %>%
-    arrange(scenario)
-  
+    arrange(U5MR_crossing)
+
   if(nrow(summary_table) > 0 && ncol(summary_table) >= 3) {
     # Clean up scenario names for display
     summary_table <- summary_table %>%
       mutate(
         scenario = case_when(
           str_detect(scenario, "STAN Random") ~ "STAN Random Baseline",
-          str_detect(scenario, "STAN Fixed") ~ "STAN Fixed Baseline", 
+          str_detect(scenario, "STAN Fixed") ~ "STAN Fixed Baseline",
           str_detect(scenario, "INLA All") ~ "INLA All",
           str_detect(scenario, "Niger MORDOR") ~ "INLA -Niger MORDOR",
           str_detect(scenario, "Niger AVENIR") ~ "INLA -Niger AVENIR",
@@ -556,14 +779,14 @@ if(file.exists(all_results_path)) {
           TRUE ~ scenario
         )
       )
-    
+
     kable(
       summary_table,
       caption = "\\label{tab:sensitivity-summary}\\emph{Threshold estimates across modeling scenarios and calculation methods}",
       booktabs = TRUE,
       align = c("l", rep("c", ncol(summary_table)-1)),
       linesep = c("", "", rep("", nrow(summary_table)-3))
-    )
+    ) %>% kable_styling(latex_options = "HOLD_position")
   }
 } else {
   cat("\\textit{Sensitivity analysis results not available during compilation.}")
@@ -585,17 +808,9 @@ These thresholds compare favorably to current WHO recommendations. The WHO sugge
 
 \subsection{Limitations}
 
-Several limitations should be acknowledged. We modeled baseline mortality as uncertain rather than fixed, properly accounting for estimation error, but results depend on the quality of spatial modeling assumptions. Alternative specifications yield similar crossings with wider intervals, supporting robustness.
+Several limitations should be acknowledged. We modeled baseline mortality as uncertain rather than fixed, properly accounting for estimation error, but results depend on the quality of spatial modeling assumptions. Alternative specifications yield similar crossings with wider intervals, supporting robustness. The inference on context is based on a limited set of variables tested and the precision of these in time and space may not be high enough to detect an association (rather than that being a real result).
 
 We don't model antimicrobial resistance dynamics directly. Programs should interpret thresholds alongside local surveillance data and resistance monitoring. Our findings reflect the specific trial settings analyzed. While we included diverse epidemiological contexts, generalization to other settings requires careful consideration of local factors.
-
-\section{Conclusions}
-
-We provide the first empirically grounded cessation thresholds for azithromycin MDA programs, expressed in standard demographic terms with full uncertainty quantification. These thresholds offer a data-driven foundation for program decisions that balance mortality benefits against resistance concerns.
-
-The finding that baseline mortality explains most variation in treatment benefit, with little additional predictive value from other contextual factors, supports focused guidance based on mortality thresholds. This approach provides practical tools for program managers while acknowledging the uncertainty inherent in available evidence.
-
-Future research should examine resistance dynamics, evaluate cost-effectiveness at different mortality levels, and assess implementation experiences as programs adopt data-driven cessation criteria.
 
 
 \clearpage

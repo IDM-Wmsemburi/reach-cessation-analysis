@@ -83,7 +83,7 @@ tryCatch({
 \section{Methods}
 
 \begin{frame}{Analytical Roadmap: Objectives}
-\textbf{Five interconnected goals}
+\textbf{Four interconnected goals}
 
 \begin{enumerate}
   \item \textbf{Reference age patterns}: derive robust neonatal, infant, and child hazard profiles from DHS birth histories.
@@ -191,7 +191,7 @@ y_i \sim \text{Poisson}(\lambda_i t_i), \qquad
 \begin{itemize}
   \item Posterior predictive rates generated on dense mortality grid by treatment arm.
   \item Threshold $U^*$ is by draw mortality level where predicted curves cross.
-  \item Output: distribution of cessation thresholds (median, CrI) for IMR/U5MR.
+  \item Output: distribution of cessation thresholds (mean, CrI) for IMR/U5MR.
 \end{itemize}
 \end{frame}
 
@@ -292,22 +292,22 @@ Strong correlation between many of the indicators.
   imr <- threshold_results %>% dplyr::filter(tolower(model) %in% c("imr","infant"))
   
 u5t <- sprintf("\\textbf{U5MR:} %.1f per 1,000 live births (95\\%% CI: %.1f-%.1f)",
-               u5mr$threshold_med_1000[1],
+               u5mr$threshold_mean_1000[1],
                u5mr$threshold_lo_1000[1],
                u5mr$threshold_hi_1000[1])
 
 imt <- sprintf("\\textbf{IMR:} %.1f per 1,000 live births (95\\%% CI: %.1f-%.1f)",
-               imr$threshold_med_1000[1],
+               imr$threshold_mean_1000[1],
                imr$threshold_lo_1000[1],
                imr$threshold_hi_1000[1])
 
 u5t2 <- sprintf("%.1f per 1,000 (%.1f-%.1f)",
-               u5mr$threshold_med_1000[1],
+               u5mr$threshold_mean_1000[1],
                u5mr$threshold_lo_1000[1],
                u5mr$threshold_hi_1000[1])
 
 imt2 <- sprintf("%.1f per 1,000 (%.1f-%.1f)",
-               imr$threshold_med_1000[1],
+               imr$threshold_mean_1000[1],
                imr$threshold_lo_1000[1],
                imr$threshold_hi_1000[1])
 @
@@ -350,7 +350,7 @@ Based on posterior crossings:
 \begin{column}{0.35\textwidth}
 \textbf{Crossing visualization:}
 \begin{itemize}
-  \item Thick dashed line: threshold median
+  \item Thick dashed line: threshold mean
   \item Dotted lines: credible intervals
   \item Clear convergence of treatment/placebo curves
   \item Benefits above threshold, minimal below
@@ -484,16 +484,16 @@ n_models <- if(!is.null(all_results)) length(unique(all_results$model)) else 2
 if(!is.null(all_results)) {
   # Create summary table
   summary_table <- all_results %>%
-    filter(!is.na(median)) %>%
+    filter(!is.na(mean)) %>%
     mutate(
-      ci_display = sprintf("%.1f (%.1f-%.1f)", median, lower, upper)
+      ci_display = sprintf("%.1f (%.1f-%.1f)", mean, lower, upper)
     ) %>%
     select(scenario, model, type, ci_display) %>%
     pivot_wider(
       names_from = c(model, type), 
       values_from = ci_display,
       names_sep = "_"
-    ) 
+    ) %>% arrange(U5MR_crossing)
   
   if(nrow(summary_table) > 0) {
     cat("\\begin{center}")
@@ -573,11 +573,6 @@ Uncertainty & Not quantified & Full posterior distributions \\
   \item \textbf{Fully reproducible:} \url{https://github.com/IDM-Wmsemburi/reach-cessation-analysis}
 \end{itemize}
 
-\vspace{0.35em}
-\textbf{Next steps}
-\begin{itemize}
-  \item Refine estimates by testing sensitivity to key modeling assumptions (e.g., age-splits, spatial priors, functional form of interactions).
-\end{itemize}
 \end{frame}
 
 

@@ -459,12 +459,12 @@ threshold_results_fixed <- rbind(data.frame(qs95(thresholds_u5mr_fixed)),
 # Extract coefficients from both models
 coefficients_u5mr <- fit_u5mr$draws(variables = c("beta_mortality", "beta_trt", "beta_trt_mortality"), 
                                     format = "draws_df") %>%
-  posterior::summarise_draws(median, mad, ~quantile(.x, probs = c(0.025, 0.975))) %>%
+  posterior::summarise_draws(mean, mad, ~quantile(.x, probs = c(0.025, 0.975))) %>%
   dplyr::mutate(model = "U5MR")
 
 coefficients_imr <- fit_imr$draws(variables = c("beta_mortality", "beta_trt", "beta_trt_mortality"), 
                                   format = "draws_df") %>%
-  posterior::summarise_draws(median, mad, ~quantile(.x, probs = c(0.025, 0.975))) %>%
+  posterior::summarise_draws(mean, mad, ~quantile(.x, probs = c(0.025, 0.975))) %>%
   dplyr::mutate(model = "IMR")
 
 all_coefficients <- dplyr::bind_rows(coefficients_u5mr, coefficients_imr)
@@ -543,7 +543,7 @@ theme_clean <- function() {
 create_mortality_plot <- function(df_plot, lambda_preds_df, threshold_results_row, model_type) {
   
   # Extract threshold values
-  threshold_med <- threshold_results_row$threshold_med_1000 / 1000
+  threshold_mean <- threshold_results_row$threshold_mean_1000 / 1000
   threshold_lo <- threshold_results_row$threshold_lo_1000 / 1000
   threshold_hi <- threshold_results_row$threshold_hi_1000 / 1000
   
@@ -574,8 +574,8 @@ create_mortality_plot <- function(df_plot, lambda_preds_df, threshold_results_ro
               paste("Baseline", toupper(model_type), "Threshold"), 
               "Control", "Treated"),
     x = c(
-      if (model_type == "u5mr") c(22, 57, 63, 155, 130, 1e3*threshold_med + 2, 237, 237)
-      else c(12, 35, 42, 88, 78, 1e3*threshold_med + 2, 112, 112)
+      if (model_type == "u5mr") c(22, 57, 63, 155, 130, 1e3*threshold_mean + 2, 237, 237)
+      else c(12, 35, 42, 88, 78, 1e3*threshold_mean + 2, 112, 112)
     ),
     y = 1e3*exp(c(-4, -5.3, -5.7, -4.0, -3, -6.5, max(ovals), min(ovals))),
     label_color = c(
@@ -626,7 +626,7 @@ create_mortality_plot <- function(df_plot, lambda_preds_df, threshold_results_ro
     ) +
     
     # Threshold lines
-    ggplot2::geom_vline(xintercept = 1000 * threshold_med, lty = 2, color = "navy", linewidth = 1.0) +
+    ggplot2::geom_vline(xintercept = 1000 * threshold_mean, lty = 2, color = "navy", linewidth = 1.0) +
     ggplot2::geom_vline(xintercept = 1000 * threshold_lo, lty = 3, color = "navy", linewidth = 0.5, alpha = 0.8) +
     ggplot2::geom_vline(xintercept = 1000 * threshold_hi, lty = 3, color = "navy", linewidth = 0.5, alpha = 0.8) +
     
@@ -690,7 +690,7 @@ plot_imr <- create_mortality_plot(df_plot, lambda_preds_imr,
 
 # Summary plots
 threshold_plot <- threshold_results %>%
-  ggplot2::ggplot(ggplot2::aes(x = model, y = threshold_med_1000, color = model)) +
+  ggplot2::ggplot(ggplot2::aes(x = model, y = threshold_mean_1000, color = model)) +
   ggplot2::geom_point(size = 4) +
   ggplot2::geom_errorbar(ggplot2::aes(ymin = threshold_lo_1000, ymax = threshold_hi_1000), 
                          width = 0.2, linewidth = 1.2) +
@@ -699,7 +699,7 @@ threshold_plot <- threshold_results %>%
     subtitle = "U5MR and IMR models with crossing-based threshold calculation",
     x = "Baseline Mortality Measure",
     y = "Threshold (per 1,000 live births)",
-    caption = "Points: median thresholds; Error bars: 95% credible intervals", 
+    caption = "Points: mean thresholds; Error bars: 95% credible intervals", 
     color = "Model" 
   ) +
   ggplot2::scale_color_manual(values = c("IMR" = "darkred", "U5MR" = "darkblue")) +
@@ -715,7 +715,7 @@ coef_plot <- all_coefficients %>%
       stringr::str_detect(variable, "beta_trt_mortality") ~ "Treatment × Mortality"
     )
   ) %>%
-  ggplot2::ggplot(ggplot2::aes(x = coefficient_name, y = median, color = model)) +
+  ggplot2::ggplot(ggplot2::aes(x = coefficient_name, y = mean, color = model)) +
   ggplot2::geom_point(size = 3, position = ggplot2::position_dodge(width = 0.3)) +
   ggplot2::geom_errorbar(ggplot2::aes(ymin = `2.5%`, ymax = `97.5%`), 
                          width = 0.2, position = ggplot2::position_dodge(width = 0.3)) +
@@ -794,15 +794,15 @@ print(threshold_results)
 
 cat("\n=== COEFFICIENT ESTIMATES ===\n")
 coef_display <- all_coefficients %>% 
-  dplyr::select(model, variable, median, `2.5%`, `97.5%`) %>%
+  dplyr::select(model, variable, mean, `2.5%`, `97.5%`) %>%
   dplyr::arrange(variable, model)
 print(coef_display)
 
 cat("\n=== SUMMARY ===\n")
-cat("U5MR threshold:", round(threshold_results$threshold_med_1000[threshold_results$model == "U5MR"], 1), 
+cat("U5MR threshold:", round(threshold_results$threshold_mean_1000[threshold_results$model == "U5MR"], 1), 
     "per 1,000 live births (95% CI:", round(threshold_results$threshold_lo_1000[threshold_results$model == "U5MR"], 1),
     "-", round(threshold_results$threshold_hi_1000[threshold_results$model == "U5MR"], 1), ")\n")
-cat("IMR threshold: ", round(threshold_results$threshold_med_1000[threshold_results$model == "IMR"], 1), 
+cat("IMR threshold: ", round(threshold_results$threshold_mean_1000[threshold_results$model == "IMR"], 1), 
     "per 1,000 live births (95% CI:", round(threshold_results$threshold_lo_1000[threshold_results$model == "IMR"], 1),
     "-", round(threshold_results$threshold_hi_1000[threshold_results$model == "IMR"], 1), ")\n\n")
 

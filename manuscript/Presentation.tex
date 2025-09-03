@@ -109,7 +109,7 @@
 \section{Methods}
 
 \begin{frame}{Analytical Roadmap: Objectives}
-\textbf{Five interconnected goals}
+\textbf{Four interconnected goals}
 
 \begin{enumerate}
   \item \textbf{Reference age patterns}: derive robust neonatal, infant, and child hazard profiles from DHS birth histories.
@@ -217,7 +217,7 @@ y_i \sim \text{Poisson}(\lambda_i t_i), \qquad
 \begin{itemize}
   \item Posterior predictive rates generated on dense mortality grid by treatment arm.
   \item Threshold $U^*$ is by draw mortality level where predicted curves cross.
-  \item Output: distribution of cessation thresholds (median, CrI) for IMR/U5MR.
+  \item Output: distribution of cessation thresholds (mean, CrI) for IMR/U5MR.
 \end{itemize}
 \end{frame}
 
@@ -316,8 +316,8 @@ Strong correlation between many of the indicators.
 
 Based on posterior crossings:
 \begin{itemize}
-\item \textbf{U5MR:} 47.8 per 1,000 live births (95\% CI: 35.8-72.0)
-\item \textbf{IMR:} 26.6 per 1,000 live births (95\% CI: 20.3-37.9)
+\item \textbf{U5MR:} 49.4 per 1,000 live births (95\% CI: 35.8-72.0)
+\item \textbf{IMR:} 27.3 per 1,000 live births (95\% CI: 20.3-37.9)
 \item \textbf{Interpretation:} Treatment benefits vanish when mortality falls below these levels
 \end{itemize}
 \end{column}
@@ -353,7 +353,7 @@ Based on posterior crossings:
 \begin{column}{0.35\textwidth}
 \textbf{Crossing visualization:}
 \begin{itemize}
-  \item Thick dashed line: threshold median
+  \item Thick dashed line: threshold mean
   \item Dotted lines: credible intervals
   \item Clear convergence of treatment/placebo curves
   \item Benefits above threshold, minimal below
@@ -463,7 +463,7 @@ Find $U^*$ where $\lambda_{\text{treatment}}(U^*) = \lambda_{\text{placebo}}(U^*
 \end{frame}
 
 \begin{frame}{Sensitivity Analysis: Summary Threshold Distributions}
-\begin{center}\footnotesize\begin{tabular}{l|cc|cc}\toprule& \multicolumn{2}{c}{\textbf{U5MR}} & \multicolumn{2}{c}{\textbf{IMR}} \\\textbf{Scenario} & Analytical & Crossing & Analytical & Crossing \\\midrule STAN Random Baseline & 33.6 (0.0-3257.3) & 47.8 (35.8-72.0) & 19.7 (0.0-10912.0) & 26.6 (20.3-37.9) \\STAN Fixed Baseline & 53.8 (30.7-69.9) & 54.4 (37.6-70.1) & 29.5 (17.4-37.2) & 29.9 (21.3-37.3) \\INLA All & 53.3 (30.2-69.6) & 53.9 (37.7-69.6) & 29.9 (17.5-37.4) & 30.2 (21.4-37.5) \\INLA -Niger MORDOR & 60.2 (49.3-67.6) & 60.2 (49.4-67.6) & 33.2 (27.6-36.7) & 33.2 (27.7-36.7) \\INLA -Niger AVENIR & 60.6 (29.9-81.9) & 61.1 (38.8-82.1) & 34.2 (18.5-43.6) & 34.4 (22.5-43.7) \\INLA -Tanzania MORDOR & 57.0 (32.6-73.4) & 57.4 (39.2-73.5) & 30.7 (18.7-38.6) & 31.0 (21.4-38.7) \\INLA -Malawi MORDOR & 50.7 (24.4-68.5) & 52.3 (36.6-68.9) & 28.0 (13.7-36.5) & 28.7 (20.8-36.7) \\INLA -Burkina CHAT & 55.9 (29.6-73.7) & 56.5 (37.6-74.0) & 32.9 (20.2-41.0) & 33.0 (23.1-41.1) \\\bottomrule\end{tabular}\end{center}
+\begin{center}\footnotesize\begin{tabular}{l|cc|cc}\toprule& \multicolumn{2}{c}{\textbf{U5MR}} & \multicolumn{2}{c}{\textbf{IMR}} \\\textbf{Scenario} & Analytical & Crossing & Analytical & Crossing \\\midrule STAN Random Baseline & 35.9 (7.2-68.3) & 49.4 (35.8-72.0) & 21.0 (6.2-36.6) & 27.3 (20.3-37.9) \\INLA -Malawi MORDOR & 49.5 (22.8-69.1) & 52.2 (36.5-69.6) & 27.5 (14.2-36.9) & 28.9 (21.0-37.1) \\INLA All & 52.1 (29.1-69.5) & 53.5 (37.6-69.7) & 29.4 (17.3-37.7) & 30.0 (21.5-37.9) \\STAN Fixed Baseline & 52.8 (30.9-69.9) & 54.1 (37.6-70.1) & 29.0 (17.4-37.2) & 29.7 (21.3-37.3) \\INLA -Burkina CHAT & 54.8 (29.3-73.4) & 56.4 (37.7-73.8) & 32.2 (19.3-41.1) & 32.8 (22.7-41.1) \\INLA -Tanzania MORDOR & 55.9 (33.6-73.1) & 56.8 (38.7-73.2) & 30.0 (17.9-38.4) & 30.7 (21.5-38.4) \\INLA -Niger MORDOR & 59.6 (47.9-67.4) & 59.6 (48.0-67.4) & 32.8 (26.9-36.8) & 32.8 (27.0-36.8) \\INLA -Niger AVENIR & 59.1 (30.2-81.3) & 60.6 (38.7-81.5) & 33.4 (18.4-43.6) & 34.0 (22.5-43.7) \\\bottomrule\end{tabular}\end{center}
 
 \vspace{0.3cm}
 \begin{itemize}
@@ -482,8 +482,8 @@ Find $U^*$ where $\lambda_{\text{treatment}}(U^*) = \lambda_{\text{placebo}}(U^*
 \toprule
 & \textbf{WHO 2020} & \textbf{This Study} \\
 \midrule
-IMR threshold & 60 per 1,000 & 26.6 per 1,000 (20.3-37.9) \\
-U5MR threshold & 80 per 1,000 & 47.8 per 1,000 (35.8-72.0) \\
+IMR threshold & 60 per 1,000 & 27.3 per 1,000 (20.3-37.9) \\
+U5MR threshold & 80 per 1,000 & 49.4 per 1,000 (35.8-72.0) \\
 Basis & Expert opinion & Trial data analysis \\
 Uncertainty & Not quantified & Full posterior distributions \\
 \bottomrule
@@ -513,11 +513,6 @@ Uncertainty & Not quantified & Full posterior distributions \\
   \item \textbf{Fully reproducible:} \url{https://github.com/IDM-Wmsemburi/reach-cessation-analysis}
 \end{itemize}
 
-\vspace{0.35em}
-\textbf{Next steps}
-\begin{itemize}
-  \item Refine estimates by testing sensitivity to key modeling assumptions (e.g., age-splits, spatial priors, functional form of interactions).
-\end{itemize}
 \end{frame}
 
 
