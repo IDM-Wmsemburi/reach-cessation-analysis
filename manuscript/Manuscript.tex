@@ -130,7 +130,7 @@ The WHO tried to balance these concerns in 2020, recommending targeted use only 
 
 The aim of our research is simple yet significant: to provide the first data-driven basis for defining cessation criteria in azithromycin mass drug administration (MDA) programs.
 
-Building on established approaches for spatial mortality estimation \citep{besag1991bym, mercer2015aoas, wakefield2020insr}, we conduct a comprehensive secondary analysis of cluster-randomized trial data. Our four-stage Bayesian framework (i) establishes age-specific mortality patterns anchored to demographic survey data, (ii) derives trial-specific mortality estimates, (iii) produces spatially coherent community-level baseline mortality surfaces, and (iv) develops threshold models to identify the mortality levels at which treatment benefits are no longer observed.
+Building on established approaches for spatial mortality estimation \citep{besag1991bym, mercer2015aoas, wakefield2020insr}, we conduct a comprehensive secondary analysis of cluster-randomized trial data. Our four-stage Bayesian framework (i) establishes age-specfic mortality relationships from demographic surveys to impute neonate mortality, (ii) derives trial-specific overal mortality estimates, (iii) produces spatially coherent community-level baseline mortality surfaces, and (iv) develops threshold models to identify the mortality levels at which treatment benefits are no longer observed.
 
 Recognizing that mortality alone may not capture all sources of variation, we also extend the analysis to assess whether other contextual factors—such as vaccination coverage, malaria burden, and healthcare access—modify treatment effects. This allows us to situate mortality-based thresholds within the broader landscape of contextual heterogeneity.
 
@@ -416,7 +416,7 @@ We used likelihood ratio tests to compare nested models:
 \item \textbf{Modifying test:} Interaction vs. Covariate model tests whether $\beta_3 \neq 0$
 \end{itemize}
 
-Models were fit using restricted maximum likelihood with robust variance estimation to account for clustering and overdispersion.
+Models were fit using maximum likelihood with robust variance estimation to account for clustering and overdispersion.
 
 \subsection{Stage 5: Cessation threshold estimation}
 
@@ -704,7 +704,7 @@ The U5MR-based threshold is 49.4 (35.8-72.0) per 1,000 live births; the IMR-base
 \label{fig:threshold-analysis}
 \end{figure}
 
-The model coefficients show clear evidence for treatment-mortality interactions, with negative interaction terms indicating diminishing benefits as baseline mortality increases---exactly what we need for meaningful threshold identification.
+The model coefficients show clear evidence for treatment-mortality interactions, with negative interaction terms indicating diminishing benefits as baseline mortality decreases---exactly what we need for meaningful threshold identification.
 
 \newpage
 The prediction curves (Figure~\ref{fig:mortality-predictions} show how this works in practice. At high mortality levels, treatment and placebo groups have very different predicted death rates---azithromycin provides substantial benefit. As baseline mortality drops, these curves converge until they cross at our estimated thresholds. Below these crossing points, azithromycin provides no meaningful benefit.
